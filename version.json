@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "date": "2026-05-14",
-  "changelog": "Versión inicial con lista real de insumos CIMA (196 ítems en 7 categorías)"
+  "changelog": "Fix exportar PDF en iPhone y iPad"
 }
