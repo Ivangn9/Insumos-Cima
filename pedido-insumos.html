@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Pedido de Insumos · CIMA</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --r-xl: 24px;
+      --r-lg: 18px;
+      --r-md: 13px;
+      --r-sm: 10px;
+      --blue:  #007AFF;
+      --blue2: #0055D4;
+      --teal:  #30D158;
+      --red:   #FF3B30;
+      --orange:#FF9500;
+      --glass-bg:     rgba(255,255,255,0.22);
+      --glass-bg2:    rgba(255,255,255,0.14);
+      --glass-border: rgba(255,255,255,0.42);
+      --glass-inner:  inset 0 1px 0 rgba(255,255,255,0.65);
+      --shadow-card:  0 8px 32px rgba(31,70,110,0.10), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-btn:   0 4px 18px rgba(0,122,255,0.38);
+      --blur:         blur(28px) saturate(180%);
+      --text-primary: rgba(10,10,30,0.88);
+      --text-secondary: rgba(10,10,30,0.46);
+      --text-tertiary:  rgba(10,10,30,0.30);
+      --bg-from: #cce8f5;
+      --bg-mid:  #dceefa;
+      --bg-to:   #d4ecf7;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      min-height: 100dvh;
+      background: linear-gradient(160deg, var(--bg-from) 0%, var(--bg-mid) 45%, var(--bg-to) 100%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ─── Ambient background ───────────────────────── */
+    body::before {
+      content: "";
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,122,255,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 45% at 85% 85%, rgba(48,209,88,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 50% 55%, rgba(255,255,255,0.28) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M30 5v50M5 30h50' stroke='rgba(0,100,200,0.03)' stroke-width='1'/%3E%3C/svg%3E");
+    }
+
+    /* ─── Floating cross icons ─────────────────────── */
+    body::after {
+      content: "";
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect x='9' y='2' width='6' height='20' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3Crect x='2' y='9' width='20' height='6' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3C/svg%3E");
+      background-size: 120px 120px;
+      background-position: 20px 20px;
+      opacity: 0.7;
+    }
+
+    /* ─── Layout ───────────────────────────────────── */
+    .page {
+      position: relative; z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 20px 16px env(safe-area-inset-bottom, 20px);
+    }
+
+    /* ─── Glass card mixin ─────────────────────────── */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-card), var(--glass-inner);
+    }
+
+    /* ─── Header ───────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 22px;
+      border-radius: var(--r-xl);
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 54px; height: 54px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%);
+      box-shadow: 0 4px 18px rgba(0,122,255,0.38), inset 0 1px 0 rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 21px; font-weight: 750; letter-spacing: -0.6px;
+      color: var(--text-primary);
+    }
+
+    .brand-text p {
+      font-size: 12px; font-weight: 500; color: var(--text-secondary);
+      margin-top: 1px; letter-spacing: 0.1px;
+    }
+
+    .header-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+    /* ─── Buttons ──────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 17px;
+      border-radius: 12px; border: none;
+      font-size: 14px; font-weight: 620;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #007AFF 0%, #0055D4 100%);
+      color: #fff;
+      box-shadow: var(--shadow-btn);
+    }
+    .btn-primary:hover { box-shadow: 0 6px 24px rgba(0,122,255,0.50); }
+
+    .btn-ghost-red {
+      background: rgba(255,59,48,0.10);
+      border: 1px solid rgba(255,59,48,0.18);
+      color: var(--red);
+    }
+    .btn-ghost-red:hover { background: rgba(255,59,48,0.16); }
+
+    .btn-icon { font-size: 16px; line-height: 1; }
+
+    /* ─── Info form ────────────────────────────────── */
+    .info-section {
+      padding: 20px 22px;
+      border-radius: var(--r-xl);
+      margin-bottom: 16px;
+    }
+
+    .section-label {
+      font-size: 11px; font-weight: 680;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+
+    .form-group label {
+      font-size: 12px; font-weight: 580;
+      color: var(--text-secondary);
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 10px 13px;
+      background: rgba(255,255,255,0.38);
+      border: 1px solid rgba(255,255,255,0.55);
+      border-radius: var(--r-md);
+      font-size: 14px; color: var(--text-primary);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      -webkit-appearance: none;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: rgba(0,122,255,0.40);
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+      background: rgba(255,255,255,0.60);
+    }
+    .form-group input::placeholder,
+    .form-group textarea::placeholder { color: var(--text-tertiary); }
+    .form-group textarea { resize: vertical; min-height: 64px; }
+
+    /* ─── Summary strip ────────────────────────────── */
+    .summary-strip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 14px 18px;
+      border-radius: var(--r-lg);
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.30);
+      border: 1px solid rgba(255,255,255,0.48);
+      border-radius: 30px;
+      flex: 1; min-width: 110px;
+    }
+
+    .stat-dot {
+      width: 30px; height: 30px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .stat-dot.blue   { background: rgba(0,122,255,0.14); }
+    .stat-dot.orange { background: rgba(255,149,0,0.14); }
+    .stat-dot.green  { background: rgba(48,209,88,0.14); }
+
+    .stat-info .stat-num {
+      font-size: 19px; font-weight: 750; line-height: 1.1;
+      color: var(--text-primary);
+    }
+    .stat-info .stat-lbl {
+      font-size: 10px; font-weight: 560;
+      color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;
+    }
+
+    /* ─── Search ───────────────────────────────────── */
+    .search-wrap {
+      position: relative; margin-bottom: 14px;
+    }
+    .search-icon {
+      position: absolute; left: 13px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px; color: var(--text-tertiary); pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 13px 12px 38px;
+      background: var(--glass-bg);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-lg);
+      font-size: 15px; color: var(--text-primary);
+      font-family: inherit;
+      outline: none;
+      box-shadow: var(--shadow-card), var(--glass-inner);
+      transition: all 0.2s;
+      -webkit-appearance: none;
+    }
+    .search-input:focus {
+      border-color: rgba(0,122,255,0.35);
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.12), var(--shadow-card);
+    }
+    .search-input::placeholder { color: var(--text-tertiary); }
+
+    /* ─── Category block ───────────────────────────── */
+    .category-block { margin-bottom: 18px; }
+
+    .cat-header {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 6px 8px;
+    }
+
+    .cat-icon-wrap {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+
+    .cat-title {
+      font-size: 12px; font-weight: 680;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      color: var(--text-secondary);
+    }
+
+    .col-heads {
+      display: flex; justify-content: flex-end;
+      gap: 6px; padding: 0 14px 6px;
+    }
+    .col-head {
+      font-size: 10px; font-weight: 640;
+      text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--text-tertiary);
+      width: 88px; text-align: center;
+    }
+
+    /* ─── Supply list card ─────────────────────────── */
+    .supply-card {
+      border-radius: var(--r-xl);
+      overflow: hidden;
+    }
+
+    .supply-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.24);
+      transition: background 0.15s;
+    }
+    .supply-row:last-child { border-bottom: none; }
+    .supply-row:hover { background: rgba(255,255,255,0.14); }
+    .supply-row.active-row { background: rgba(0,122,255,0.05); }
+
+    .supply-info {
+      display: flex; align-items: center; gap: 10px;
+      min-width: 0; flex: 1;
+    }
+
+    .supply-ico {
+      width: 38px; height: 38px; border-radius: 11px;
+      background: rgba(0,122,255,0.10);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px; flex-shrink: 0;
+    }
+
+    .supply-text { min-width: 0; }
+    .supply-name {
+      font-size: 14px; font-weight: 560;
+      color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .supply-code {
+      font-size: 11px; color: var(--text-tertiary);
+      margin-top: 1px;
+    }
+
+    /* ─── Counters ─────────────────────────────────── */
+    .counters { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
+    .ctr-group {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 3px;
+    }
+    .ctr-lbl {
+      font-size: 9px; font-weight: 660;
+      text-transform: uppercase; letter-spacing: 0.3px;
+      color: var(--text-tertiary);
+    }
+
+    .ctr {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,0.38);
+      border: 1px solid rgba(255,255,255,0.60);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .ctr-btn {
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; border: none;
+      font-size: 20px; font-weight: 300;
+      color: var(--blue);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+      user-select: none; line-height: 1;
+      padding-bottom: 1px;
+    }
+    .ctr-btn:hover  { background: rgba(0,122,255,0.10); }
+    .ctr-btn:active { background: rgba(0,122,255,0.20); }
+
+    .ctr-val {
+      min-width: 28px; text-align: center;
+      font-size: 14px; font-weight: 660;
+      color: var(--text-primary);
+    }
+    .ctr-val.nonzero { color: var(--blue); }
+
+    /* ─── Empty state ──────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 48px 20px;
+      color: var(--text-tertiary); font-size: 15px;
+    }
+    .empty-state .es-icon { font-size: 42px; margin-bottom: 12px; }
+
+    /* ─── Footer ───────────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding: 18px 10px 8px;
+      font-size: 11px; color: var(--text-tertiary);
+      letter-spacing: 0.2px;
+    }
+
+    /* ─── Toast ────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 30px; left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      background: rgba(20,20,30,0.78);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 14px; font-weight: 530;
+      z-index: 9999;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      white-space: nowrap;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ─── Modal confirm ────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 8888;
+      background: rgba(0,0,0,0.30);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-box {
+      background: rgba(245,248,255,0.92);
+      backdrop-filter: blur(30px) saturate(200%);
+      -webkit-backdrop-filter: blur(30px) saturate(200%);
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 20px;
+      padding: 26px 24px 20px;
+      max-width: 320px; width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+      transform: scale(0.94);
+      transition: transform 0.22s cubic-bezier(0.34,1.36,0.64,1);
+    }
+    .modal-overlay.open .modal-box { transform: scale(1); }
+
+    .modal-icon { font-size: 38px; margin-bottom: 10px; text-align: center; }
+    .modal-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+    .modal-desc { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions .btn { flex: 1; justify-content: center; }
+
+    .btn-ghost {
+      background: rgba(120,120,140,0.10);
+      border: 1px solid rgba(120,120,140,0.18);
+      color: var(--text-secondary);
+    }
+
+    /* ─── Responsive ───────────────────────────────── */
+    @media (max-width: 600px) {
+      .page { padding: 12px 10px env(safe-area-inset-bottom, 12px); }
+      .header { padding: 14px 16px; border-radius: var(--r-lg); }
+      .brand-icon { width: 44px; height: 44px; font-size: 22px; border-radius: 13px; }
+      .brand-text h1 { font-size: 17px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: 1; }
+      .col-heads { display: none; }
+      .supply-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .counters { width: 100%; justify-content: flex-end; }
+      .ctr-btn { width: 34px; height: 34px; }
+      .stat-pill { min-width: calc(50% - 6px); }
+    }
+
+    @media (max-width: 360px) {
+      .ctr-btn { width: 28px; height: 28px; }
+      .ctr-val { min-width: 22px; font-size: 13px; }
+      .counters { gap: 4px; }
+    }
+
+    @media (min-width: 601px) and (max-width: 768px) {
+      .page { padding: 16px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Modal confirm ───────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Limpiar formulario</div>
+    <div class="modal-desc">Se borrarán todos los datos y cantidades ingresadas. ¿Continuar?</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-ghost-red" onclick="confirmClear()">Limpiar todo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast ───────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<!-- ─── Page ────────────────────────────────────────── -->
+<div class="page">
+
+  <!-- Header -->
+  <header class="header glass">
+    <div class="header-brand">
+      <div class="brand-icon">🏥</div>
+      <div class="brand-text">
+        <h1>Pedido de Insumos</h1>
+        <p>CIMA · Sistema de Gestión</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost-red" onclick="openModal()">
+        <span class="btn-icon">✕</span> Limpiar
+      </button>
+      <button class="btn btn-primary" onclick="exportPDF()">
+        <span class="btn-icon">⬇</span> Exportar PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- Info form -->
+  <section class="info-section glass">
+    <div class="section-label">Información del pedido</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Solicitante</label>
+        <input type="text" id="solicitante" placeholder="Nombre y apellido…" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label>Fecha del pedido</label>
+        <input type="date" id="fecha" />
+      </div>
+      <div class="form-group">
+        <label>Sector / Servicio</label>
+        <input type="text" id="sector" placeholder="Ej: Guardia, UTI, Neonatología…" />
+      </div>
+      <div class="form-group">
+        <label>Prioridad</label>
+        <select id="prioridad">
+          <option value="Normal">Normal</option>
+          <option value="Urgente">Urgente</option>
+          <option value="Muy urgente">Muy urgente</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Observaciones</label>
+        <textarea id="observaciones" placeholder="Notas adicionales para el área de insumos…"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- Summary -->
+  <div class="summary-strip glass">
+    <div class="stat-pill">
+      <div class="stat-dot blue">📦</div>
+      <div class="stat-info">
+        <div class="stat-num" id="stat-items">0</div>
+        <div class="stat-lbl">Ítems</div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-dot orange">🗃️</div>
+      <div class="stat-info">
+        <div class="stat-num" id="stat-cajas">0</div>
+        <div class="stat-lbl">Cajas</div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-dot green">📋</div>
+      <div class="stat-info">
+        <div class="stat-num" id="stat-packs">0</div>
+        <div class="stat-lbl">Packs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" type="search" id="searchInput"
+           placeholder="Buscar insumo…" oninput="filterSupplies()" autocomplete="off" />
+  </div>
+
+  <!-- Supplies -->
+  <div id="suppliesContainer"></div>
+
+  <div class="footer">CIMA · Sistema de Pedido de Insumos · 2026</div>
+</div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+const SUPPLIES = {
+  "Descartables": {
+    icon: "💉", color: "rgba(0,122,255,0.12)",
+    items: [
+      { id: "d01", name: "Jeringas 1ml",        code: "JER-001" },
+      { id: "d02", name: "Jeringas 3ml",        code: "JER-003" },
+      { id: "d03", name: "Jeringas 5ml",        code: "JER-005" },
+      { id: "d04", name: "Jeringas 10ml",       code: "JER-010" },
+      { id: "d05", name: "Jeringas 20ml",       code: "JER-020" },
+      { id: "d06", name: "Jeringas 50ml",       code: "JER-050" },
+      { id: "d07", name: "Agujas 18G",          code: "AGU-018" },
+      { id: "d08", name: "Agujas 21G",          code: "AGU-021" },
+      { id: "d09", name: "Agujas 23G",          code: "AGU-023" },
+      { id: "d10", name: "Agujas 25G",          code: "AGU-025" },
+    ]
+  },
+  "Guantes": {
+    icon: "🧤", color: "rgba(255,149,0,0.12)",
+    items: [
+      { id: "g01", name: "Guantes látex S",     code: "GLT-S" },
+      { id: "g02", name: "Guantes látex M",     code: "GLT-M" },
+      { id: "g03", name: "Guantes látex L",     code: "GLT-L" },
+      { id: "g04", name: "Guantes nitrilo S",   code: "GNI-S" },
+      { id: "g05", name: "Guantes nitrilo M",   code: "GNI-M" },
+      { id: "g06", name: "Guantes nitrilo L",   code: "GNI-L" },
+      { id: "g07", name: "Guantes estériles 7", code: "GES-7" },
+      { id: "g08", name: "Guantes estériles 7½",code: "GES-7H" },
+      { id: "g09", name: "Guantes estériles 8", code: "GES-8" },
+    ]
+  },
+  "Curación": {
+    icon: "🩹", color: "rgba(255,59,48,0.10)",
+    items: [
+      { id: "c01", name: "Gasa estéril 10×10",  code: "GAS-10" },
+      { id: "c02", name: "Gasa no estéril",      code: "GAS-NE" },
+      { id: "c03", name: "Apósitos adhesivos",   code: "APO-001" },
+      { id: "c04", name: "Apósito hidrocoloide", code: "APO-HID" },
+      { id: "c05", name: "Vendas de gasa",       code: "VEN-GAS" },
+      { id: "c06", name: "Vendas elásticas",     code: "VEN-ELA" },
+      { id: "c07", name: "Esparadrapo 5cm",      code: "ESP-005" },
+      { id: "c08", name: "Micropore 2,5cm",      code: "MIC-025" },
+      { id: "c09", name: "Alcohol 70°",          code: "ALC-070" },
+      { id: "c10", name: "Alcohol 96°",          code: "ALC-096" },
+      { id: "c11", name: "Iodopovidona 10%",     code: "IOD-010" },
+      { id: "c12", name: "Clorhexidina 2%",      code: "CLH-002" },
+    ]
+  },
+  "Catéteres e IV": {
+    icon: "🩺", color: "rgba(48,209,88,0.10)",
+    items: [
+      { id: "i01", name: "Catéter IV 16G",       code: "CAT-16" },
+      { id: "i02", name: "Catéter IV 18G",       code: "CAT-18" },
+      { id: "i03", name: "Catéter IV 20G",       code: "CAT-20" },
+      { id: "i04", name: "Catéter IV 22G",       code: "CAT-22" },
+      { id: "i05", name: "Catéter IV 24G",       code: "CAT-24" },
+      { id: "i06", name: "Equipo de infusión",   code: "EQI-001" },
+      { id: "i07", name: "Equipo microgotero",   code: "EQI-MIC" },
+      { id: "i08", name: "Llave de 3 vías",      code: "LLA-003" },
+      { id: "i09", name: "Conector luer lock",   code: "CON-LUE" },
+      { id: "i10", name: "Línea central CVP",    code: "CVP-001" },
+    ]
+  },
+  "Respiratorio": {
+    icon: "😷", color: "rgba(90,200,250,0.12)",
+    items: [
+      { id: "r01", name: "Mascarilla N95",       code: "MAS-N95" },
+      { id: "r02", name: "Mascarilla quirúrgica",code: "MAS-QUI" },
+      { id: "r03", name: "Cánula nasal adulto",  code: "CAN-ADU" },
+      { id: "r04", name: "Cánula nasal pediátr.",code: "CAN-PED" },
+      { id: "r05", name: "Máscara simple O₂",    code: "MAS-O2S" },
+      { id: "r06", name: "Máscara reservorio",   code: "MAS-RES" },
+      { id: "r07", name: "Nebulizador adulto",   code: "NEB-ADU" },
+      { id: "r08", name: "TET nº 7",             code: "TET-007" },
+      { id: "r09", name: "TET nº 7.5",           code: "TET-075" },
+      { id: "r10", name: "TET nº 8",             code: "TET-008" },
+    ]
+  },
+  "Diagnóstico": {
+    icon: "🔬", color: "rgba(191,90,242,0.10)",
+    items: [
+      { id: "dx1", name: "Tiras glucosa",        code: "TIR-GLU" },
+      { id: "dx2", name: "Lancetas",             code: "LAN-001" },
+      { id: "dx3", name: "Tubos EDTA 3ml",       code: "TUB-EDT" },
+      { id: "dx4", name: "Tubos SST 5ml",        code: "TUB-SST" },
+      { id: "dx5", name: "Tubos citrato",        code: "TUB-CIT" },
+      { id: "dx6", name: "Tiras orina",          code: "TIR-ORI" },
+      { id: "dx7", name: "Test COVID Ag",        code: "TST-COV" },
+    ]
+  },
+  "Higiene & Protección": {
+    icon: "🧴", color: "rgba(255,204,0,0.12)",
+    items: [
+      { id: "h01", name: "Jabón antiséptico",    code: "JAB-ANT" },
+      { id: "h02", name: "Alcohol en gel 500ml", code: "GEL-500" },
+      { id: "h03", name: "Barbijo tricapa",      code: "BAR-TRI" },
+      { id: "h04", name: "Antiparras",           code: "ANT-001" },
+      { id: "h05", name: "Camisolín descartable",code: "CAM-DES" },
+      { id: "h06", name: "Botas descartables",   code: "BOT-DES" },
+      { id: "h07", name: "Cofia descartable",    code: "COF-DES" },
+    ]
+  },
+};
+
+// ─── State ──────────────────────────────────────────────────────────────────
+const qty = {};
+Object.values(SUPPLIES).forEach(cat =>
+  cat.items.forEach(item => { qty[item.id] = { cantidad: 0, caja: 0, pack: 0 }; })
+);
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+document.getElementById("fecha").valueAsDate = new Date();
+renderAll();
+
+// ─── Render ─────────────────────────────────────────────────────────────────
+function renderAll(filter) { renderSupplies(filter || ""); }
+
+function renderSupplies(filter) {
+  const container = document.getElementById("suppliesContainer");
+  container.innerHTML = "";
+  const q = filter.toLowerCase().trim();
+  let anyResult = false;
+
+  Object.entries(SUPPLIES).forEach(([catName, cat]) => {
+    const filtered = cat.items.filter(item =>
+      !q || item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
+    );
+    if (!filtered.length) return;
+    anyResult = true;
+
+    const block = document.createElement("div");
+    block.className = "category-block";
+
+    block.innerHTML = `
+      <div class="cat-header">
+        <div class="cat-icon-wrap" style="background:${cat.color}">${cat.icon}</div>
+        <span class="cat-title">${catName}</span>
+      </div>
+      <div class="col-heads">
+        <span class="col-head">Cantidad</span>
+        <span class="col-head">Caja</span>
+        <span class="col-head">Pack</span>
+      </div>
+    `;
+
+    const card = document.createElement("div");
+    card.className = "supply-card glass";
+
+    filtered.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "supply-row" + (hasQty(item.id) ? " active-row" : "");
+      row.id = "row-" + item.id;
+      row.innerHTML = `
+        <div class="supply-info">
+          <div class="supply-ico" style="background:${cat.color}">${cat.icon}</div>
+          <div class="supply-text">
+            <div class="supply-name">${item.name}</div>
+            <div class="supply-code">${item.code}</div>
+          </div>
+        </div>
+        <div class="counters">
+          ${mkCtr(item.id, "cantidad", "UND")}
+          ${mkCtr(item.id, "caja",     "CAJA")}
+          ${mkCtr(item.id, "pack",     "PACK")}
+        </div>
+      `;
+      card.appendChild(row);
+    });
+
+    block.appendChild(card);
+    container.appendChild(block);
+  });
+
+  if (!anyResult) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="es-icon">🔍</div>
+        No se encontraron insumos para "<strong>${escHtml(filter)}</strong>"
+      </div>`;
+  }
+}
+
+function mkCtr(id, type, label) {
+  const v = qty[id][type];
+  return `
+    <div class="ctr-group">
+      <span class="ctr-lbl">${label}</span>
+      <div class="ctr">
+        <button class="ctr-btn" onclick="dec('${id}','${type}')" ontouchstart="">−</button>
+        <span class="ctr-val${v ? " nonzero" : ""}" id="v-${id}-${type}">${v}</span>
+        <button class="ctr-btn" onclick="inc('${id}','${type}')" ontouchstart="">+</button>
+      </div>
+    </div>`;
+}
+
+// ─── Counter ops ────────────────────────────────────────────────────────────
+function inc(id, type) {
+  qty[id][type]++;
+  refreshVal(id, type);
+  refreshRow(id);
+  refreshStats();
+}
+function dec(id, type) {
+  if (qty[id][type] > 0) { qty[id][type]--; refreshVal(id, type); refreshRow(id); refreshStats(); }
+}
+
+function refreshVal(id, type) {
+  const el = document.getElementById(`v-${id}-${type}`);
+  if (!el) return;
+  const v = qty[id][type];
+  el.textContent = v;
+  el.className = "ctr-val" + (v ? " nonzero" : "");
+}
+function refreshRow(id) {
+  const row = document.getElementById("row-" + id);
+  if (row) row.classList.toggle("active-row", hasQty(id));
+}
+function hasQty(id) {
+  const q = qty[id];
+  return q.cantidad > 0 || q.caja > 0 || q.pack > 0;
+}
+
+// ─── Stats ──────────────────────────────────────────────────────────────────
+function refreshStats() {
+  let items = 0, cajas = 0, packs = 0;
+  Object.keys(qty).forEach(id => {
+    const q = qty[id];
+    if (hasQty(id)) items++;
+    cajas += q.caja;
+    packs += q.pack;
+  });
+  document.getElementById("stat-items").textContent = items;
+  document.getElementById("stat-cajas").textContent = cajas;
+  document.getElementById("stat-packs").textContent  = packs;
+}
+
+// ─── Search ─────────────────────────────────────────────────────────────────
+function filterSupplies() {
+  renderSupplies(document.getElementById("searchInput").value);
+}
+
+// ─── Clear / Modal ───────────────────────────────────────────────────────────
+function openModal()  { document.getElementById("modalOverlay").classList.add("open"); }
+function closeModal() { document.getElementById("modalOverlay").classList.remove("open"); }
+
+function confirmClear() {
+  Object.keys(qty).forEach(id => { qty[id] = { cantidad: 0, caja: 0, pack: 0 }; });
+  ["solicitante","sector","observaciones"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("prioridad").value = "Normal";
+  document.getElementById("fecha").valueAsDate = new Date();
+  document.getElementById("searchInput").value = "";
+  renderSupplies("");
+  refreshStats();
+  closeModal();
+  toast("Formulario limpiado ✓");
+}
+
+// ─── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ─── Export PDF ──────────────────────────────────────────────────────────────
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  const solicitante  = document.getElementById("solicitante").value  || "—";
+  const fecha        = document.getElementById("fecha").value         || "—";
+  const sector       = document.getElementById("sector").value        || "—";
+  const prioridad    = document.getElementById("prioridad").value     || "Normal";
+  const observaciones= document.getElementById("observaciones").value || "";
+
+  const W = 210, M = 14;
+
+  // ── Header band ──
+  doc.setFillColor(0, 122, 255);
+  doc.rect(0, 0, W, 32, "F");
+
+  // Watermark cross on header
+  doc.setFillColor(255,255,255);
+  doc.setGlobalAlpha(0.08);
+  for (let x = 160; x < W; x += 18) {
+    doc.rect(x,    6,  6, 20, "F");
+    doc.rect(x-7, 13, 20,  6, "F");
+  }
+  doc.setGlobalAlpha(1);
+
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(19); doc.setFont("helvetica","bold");
+  doc.text("PEDIDO DE INSUMOS", M, 14);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text("CIMA · Sistema de Gestión de Insumos Hospitalarios", M, 22);
+  doc.text(`Generado: ${new Date().toLocaleString("es-AR")}`, M, 28);
+
+  // Prioridad badge on header
+  if (prioridad !== "Normal") {
+    const badgeColor = prioridad === "Muy urgente" ? [255,59,48] : [255,149,0];
+    doc.setFillColor(...badgeColor);
+    doc.roundedRect(W - 50, 10, 36, 12, 3, 3, "F");
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(8); doc.setFont("helvetica","bold");
+    doc.text(prioridad.toUpperCase(), W - 32, 17.5, { align: "center" });
+  }
+
+  // ── Info band ──
+  doc.setFillColor(245, 247, 252);
+  doc.rect(0, 32, W, 30, "F");
+  doc.setDrawColor(220,228,240);
+  doc.line(0, 62, W, 62);
+
+  const infoFields = [
+    { label: "SOLICITANTE", value: solicitante, x: M    },
+    { label: "SECTOR / SERVICIO", value: sector, x: 80   },
+    { label: "FECHA",       value: fecha,        x: 155  },
+  ];
+
+  infoFields.forEach(f => {
+    doc.setFontSize(7); doc.setFont("helvetica","bold");
+    doc.setTextColor(130,140,160);
+    doc.text(f.label, f.x, 39);
+    doc.setFontSize(10); doc.setFont("helvetica","normal");
+    doc.setTextColor(30,35,50);
+    doc.text(String(f.value), f.x, 47);
+  });
+
+  // ── Table ──
+  const allItems = Object.values(SUPPLIES).flatMap(c => c.items);
+  const rows = allItems
+    .filter(item => hasQty(item.id))
+    .map(item => {
+      const q = qty[item.id];
+      return [
+        item.code,
+        item.name,
+        q.cantidad || "—",
+        q.caja     || "—",
+        q.pack      || "—",
+      ];
+    });
+
+  if (rows.length === 0) {
+    doc.setFontSize(12); doc.setTextColor(160,170,185);
+    doc.text("No hay insumos seleccionados.", W / 2, 90, { align: "center" });
+  } else {
+    doc.autoTable({
+      startY: 68,
+      head: [["Código", "Descripción del insumo", "Cantidad", "Caja", "Pack"]],
+      body: rows,
+      theme: "grid",
+      headStyles: {
+        fillColor: [0, 122, 255],
+        textColor: 255,
+        fontStyle: "bold",
+        fontSize: 9,
+        cellPadding: 4,
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: [30,35,50],
+        cellPadding: 3.5,
+      },
+      alternateRowStyles: { fillColor: [246,249,255] },
+      columnStyles: {
+        0: { cellWidth: 24, fontStyle: "bold" },
+        2: { cellWidth: 22, halign: "center" },
+        3: { cellWidth: 20, halign: "center" },
+        4: { cellWidth: 20, halign: "center" },
+      },
+      margin: { left: M, right: M },
+      didParseCell(data) {
+        if (data.section === "body" && data.column.index >= 2) {
+          const v = data.cell.raw;
+          if (v !== "—" && Number(v) > 0) {
+            data.cell.styles.textColor = [0,90,210];
+            data.cell.styles.fontStyle = "bold";
+          }
+        }
+      },
+    });
+  }
+
+  // ── Observations ──
+  const finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 90) + 8;
+  if (observaciones.trim()) {
+    doc.setFillColor(245,247,252);
+    doc.roundedRect(M, finalY, W - 2*M, 7, 2, 2, "F");
+    doc.setFontSize(7.5); doc.setFont("helvetica","bold");
+    doc.setTextColor(120,130,150);
+    doc.text("OBSERVACIONES", M+3, finalY + 5);
+
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(9); doc.setTextColor(40,45,60);
+    const lines = doc.splitTextToSize(observaciones, W - 2*M - 4);
+    doc.text(lines, M+3, finalY + 13);
+  }
+
+  // ── Footer ──
+  const pH = doc.internal.pageSize.height;
+  doc.setFillColor(0,122,255);
+  doc.rect(0, pH-12, W, 12, "F");
+  doc.setFontSize(7.5); doc.setFont("helvetica","normal");
+  doc.setTextColor(255,255,255);
+  doc.text("CIMA · Sistema de Gestión de Insumos Hospitalarios", M, pH-4.5);
+  doc.text(`Pág. 1`, W-M, pH-4.5, { align: "right" });
+
+  const fname = `Pedido_Insumos_${fecha.replace(/-/g,"")}_${solicitante.split(" ")[0] || "CIMA"}.pdf`;
+  doc.save(fname);
+  toast("PDF exportado exitosamente ✓");
+}
+</script>
+</body>
+</html>
