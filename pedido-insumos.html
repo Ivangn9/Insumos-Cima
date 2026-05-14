@@ -1274,8 +1274,22 @@ function exportPDF() {
   doc.text(`Pág. 1`, W-M, pH-4.5, { align: "right" });
 
   const fname = `Pedido_Insumos_${fecha.replace(/-/g,"")}_${solicitante.split(" ")[0] || "CIMA"}.pdf`;
-  doc.save(fname);
-  toast("PDF exportado exitosamente ✓");
+
+  // iOS Safari no soporta descarga directa — abre en nueva pestaña para compartir/guardar
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    const blob = doc.output("blob");
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, "_blank");
+    // Liberar la URL de objeto después de abrir
+    if (win) setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
+  } else {
+    doc.save(fname);
+    toast("PDF exportado exitosamente ✓");
+  }
 }
 </script>
 </body>
