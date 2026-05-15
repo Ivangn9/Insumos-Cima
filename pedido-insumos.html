@@ -515,9 +515,33 @@
     /* ─── Responsive ───────────────────────────────── */
     @media (max-width: 600px) {
       .page { padding: 12px 10px env(safe-area-inset-bottom, 12px); }
-      .header { padding: 14px 16px; border-radius: var(--r-lg); }
+
+      /* Header stack vertical en mobile */
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: var(--r-lg);
+      }
+      .header-brand { justify-content: flex-start; }
       .brand-icon { width: 44px; height: 44px; font-size: 22px; border-radius: 13px; }
       .brand-text h1 { font-size: 17px; }
+
+      /* Actions: 2×2 grid en mobile */
+      .header-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .version-badge {
+        grid-column: 1 / 2;
+        justify-content: center;
+      }
+      #btnUpdate { grid-column: 2 / 3; justify-content: center; }
+      .btn-ghost-red { grid-column: 1 / 2; justify-content: center; }
+      .btn-primary   { grid-column: 2 / 3; justify-content: center; }
+
       .form-grid { grid-template-columns: 1fr; }
       .form-group.full { grid-column: 1; }
       .col-heads { display: none; }
@@ -666,7 +690,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.0";
+const CURRENT_VERSION = "1.0.2";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const SUPPLIES = {
@@ -1275,16 +1299,13 @@ function exportPDF() {
 
   const fname = `Pedido_Insumos_${fecha.replace(/-/g,"")}_${solicitante.split(" ")[0] || "CIMA"}.pdf`;
 
-  // iOS Safari no soporta descarga directa — abre en nueva pestaña para compartir/guardar
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   if (isIOS) {
-    const blob = doc.output("blob");
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, "_blank");
-    // Liberar la URL de objeto después de abrir
-    if (win) setTimeout(() => URL.revokeObjectURL(url), 10000);
+    // iOS Safari: dataurlnewwindow abre el PDF en una nueva pestaña
+    // El usuario luego usa ⎙ Compartir en Safari para guardar o imprimir
+    doc.output("dataurlnewwindow", { filename: fname });
     toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
   } else {
     doc.save(fname);
