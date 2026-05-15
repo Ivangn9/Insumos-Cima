@@ -577,7 +577,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.4</span>
+  <span id="versionLabel">V1.0.5</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -689,7 +689,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.4";
+const CURRENT_VERSION = "1.0.5";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const SUPPLIES = {
@@ -1149,8 +1149,36 @@ function applyUpdate() {
   location.href = location.pathname + "?v=" + Date.now();
 }
 
+function hasUnsavedData() {
+  if (document.getElementById("solicitante").value.trim()) return true;
+  if (document.getElementById("sector").value.trim()) return true;
+  return Object.values(qty).some(q => q.cantidad > 0 || q.caja > 0 || q.pack > 0);
+}
+
+let _latestVersion = null;
+
 // Auto-check on load (silent)
 window.addEventListener("load", () => checkUpdate(false));
+
+// Chequeo automático cada 5 minutos
+setInterval(async () => {
+  try {
+    const res  = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
+    const data = await res.json();
+    const latest = data.version || CURRENT_VERSION;
+    if (compareSemver(latest, CURRENT_VERSION) > 0) {
+      _latestVersion = latest;
+      document.getElementById("versionDot").classList.add("outdated");
+      document.getElementById("newVersionLabel").textContent = "V" + latest;
+      document.getElementById("updateBanner").classList.add("visible");
+      if (!hasUnsavedData()) {
+        // Sin datos cargados: recarga automática silenciosa
+        applyUpdate();
+      }
+      // Con datos cargados: solo muestra el banner, no recarga
+    }
+  } catch { /* sin conexión, ignorar */ }
+}, 5 * 60 * 1000);
 
 // ─── Export PDF ──────────────────────────────────────────────────────────────
 async function exportPDF() {
