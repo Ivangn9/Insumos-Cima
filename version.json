@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
+  "version": "1.0.9",
   "date": "2026-05-15",
-  "changelog": "Agregar logo CIMA en topbar y header; PWA manifest con ícono médico para escritorio"
+  "changelog": "PDF rediseñado: logo CIMA, cabecera naval, marca de agua, separadores por categoría, pie con paginación, soporte multipágina"
 }
