@@ -162,6 +162,13 @@
     }
     .btn-ghost-red:hover { background: rgba(255,59,48,0.16); }
 
+    .btn-share {
+      background: rgba(48,209,88,0.12);
+      border: 1px solid rgba(48,209,88,0.28);
+      color: #1a8f3c;
+    }
+    .btn-share:hover { background: rgba(48,209,88,0.20); }
+
     .btn-icon { font-size: 16px; line-height: 1; }
 
     /* ─── Info form ────────────────────────────────── */
@@ -611,6 +618,28 @@
   </div>
 </div>
 
+<!-- ─── Share fallback modal ────────────────────────── -->
+<div class="modal-overlay" id="shareOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">&#8679;</div>
+    <div class="modal-title">Compartir pedido</div>
+    <div class="modal-desc">Elegí cómo enviar el resumen del pedido.</div>
+    <div class="modal-actions" style="flex-direction:column;">
+      <a id="shareWaLink" href="#" target="_blank" rel="noopener"
+         class="btn btn-primary" style="justify-content:center;text-decoration:none;"
+         onclick="document.getElementById('shareOverlay').classList.remove('open')">
+        WhatsApp
+      </a>
+      <a id="shareMailLink" href="#"
+         class="btn btn-share" style="justify-content:center;text-decoration:none;margin-top:0;"
+         onclick="document.getElementById('shareOverlay').classList.remove('open')">
+        Correo electrónico
+      </a>
+      <button class="btn btn-ghost" onclick="document.getElementById('shareOverlay').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Custom item modal ───────────────────────────── -->
 <div class="modal-overlay" id="addManualOverlay">
   <div class="modal-box">
@@ -633,7 +662,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.15</span>
+  <span id="versionLabel">V1.0.16</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -657,6 +686,9 @@
     <div class="header-actions">
       <button class="btn btn-ghost-red" onclick="openModal()">
         <span class="btn-icon">✕</span> Limpiar
+      </button>
+      <button class="btn btn-share" onclick="shareOrder()">
+        <span class="btn-icon">&#8679;</span> Compartir
       </button>
       <button class="btn btn-primary" onclick="exportPDF()">
         <span class="btn-icon">⬇</span> Exportar PDF
@@ -767,7 +799,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.15";
+const CURRENT_VERSION = "1.0.16";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1216,6 +1248,86 @@ function filterSupplies() {
 // ─── Clear / Modal ───────────────────────────────────────────────────────────
 function openModal()  { document.getElementById("modalOverlay").classList.add("open"); }
 function closeModal() { document.getElementById("modalOverlay").classList.remove("open"); }
+
+// ─── Share order ─────────────────────────────────────────────────────────────
+function buildOrderText() {
+  const solicitante = document.getElementById("solicitante").value || "—";
+  const fecha       = document.getElementById("fecha").value       || "—";
+  const sector      = document.getElementById("sector").value      || "—";
+  const prioridad   = document.getElementById("prioridad").value   || "Normal";
+  const equipo      = document.getElementById("equipo").value      || "—";
+  const obs         = document.getElementById("observaciones").value.trim();
+
+  let lines = [];
+  lines.push("PEDIDO DE INSUMOS - CIMA");
+  lines.push("─────────────────────────");
+  lines.push("Solicitante: " + solicitante);
+  lines.push("Centro: " + sector);
+  lines.push("Equipo: " + equipo);
+  lines.push("Fecha: " + fecha);
+  lines.push("Prioridad: " + prioridad);
+  if (obs) lines.push("Obs: " + obs);
+  lines.push("");
+
+  let totalItems = 0;
+  Object.entries(SUPPLIES).forEach(function(entry) {
+    const catName = entry[0], cat = entry[1];
+    const catItems = cat.items.filter(function(item) { return hasQty(item.id); });
+    if (!catItems.length) return;
+    lines.push(catName.toUpperCase() + ":");
+    catItems.forEach(function(item) {
+      const q = qty[item.id];
+      const parts = [];
+      if (q.cantidad) parts.push("Cant: " + q.cantidad);
+      if (q.caja)     parts.push("Caja: " + q.caja);
+      if (q.pack)     parts.push("Pack: " + q.pack);
+      lines.push("- " + item.name + " (" + parts.join(" | ") + ")");
+      totalItems++;
+    });
+    lines.push("");
+  });
+
+  const custWithQty = customItems.filter(function(item) { return hasQty(item.id); });
+  if (custWithQty.length) {
+    lines.push("INSUMOS ADICIONALES:");
+    custWithQty.forEach(function(item) {
+      const q = qty[item.id];
+      const parts = [];
+      if (q.cantidad) parts.push("Cant: " + q.cantidad);
+      if (q.caja)     parts.push("Caja: " + q.caja);
+      if (q.pack)     parts.push("Pack: " + q.pack);
+      lines.push("- " + item.name + " (" + parts.join(" | ") + ")");
+      totalItems++;
+    });
+    lines.push("");
+  }
+
+  lines.push("Total: " + totalItems + " insumo" + (totalItems !== 1 ? "s" : "") + " pedido" + (totalItems !== 1 ? "s" : ""));
+  return lines.join("\n");
+}
+
+function shareOrder() {
+  const allItems = Object.values(SUPPLIES).flatMap(function(c) { return c.items; })
+    .concat(customItems).filter(function(item) { return hasQty(item.id); });
+  if (!allItems.length) { toast("No hay insumos seleccionados"); return; }
+
+  const text = buildOrderText();
+  const title = "Pedido de Insumos CIMA";
+
+  if (navigator.share) {
+    navigator.share({ title: title, text: text })
+      .then(function() { toast("Pedido compartido ✓"); })
+      .catch(function(e) { if (e.name !== "AbortError") toast("No se pudo compartir"); });
+    return;
+  }
+
+  // Fallback: show modal with WhatsApp + email links
+  const enc = encodeURIComponent(text);
+  document.getElementById("shareWaLink").href   = "https://wa.me/?text=" + enc;
+  document.getElementById("shareMailLink").href =
+    "mailto:?subject=" + encodeURIComponent(title) + "&body=" + enc;
+  document.getElementById("shareOverlay").classList.add("open");
+}
 
 // ─── Custom item modal ───────────────────────────────────────────────────────
 function openAddManual() {
