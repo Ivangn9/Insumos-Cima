@@ -584,7 +584,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.12</span>
+  <span id="versionLabel">V1.0.13</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -638,8 +638,13 @@
         <input type="date" id="fecha" />
       </div>
       <div class="form-group">
-        <label>Sector / Servicio</label>
-        <input type="text" id="sector" placeholder="Ej: Guardia, UTI, Neonatología…" />
+        <label>Centro</label>
+        <select id="sector">
+          <option value="">— Seleccionar —</option>
+          <option value="GN">GN</option>
+          <option value="Pedernera">Pedernera</option>
+          <option value="CRS">CRS</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Prioridad</label>
@@ -647,6 +652,18 @@
           <option value="Normal">Normal</option>
           <option value="Urgente">Urgente</option>
           <option value="Muy urgente">Muy urgente</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Equipo</label>
+        <select id="equipo">
+          <option value="">— Seleccionar —</option>
+          <option value="TC">TC</option>
+          <option value="RM">RM</option>
+          <option value="MG">MG</option>
+          <option value="RX">RX</option>
+          <option value="DMO">DMO</option>
+          <option value="ORTOPANTOMOGRAFIA">Ortopantomografía</option>
         </select>
       </div>
       <div class="form-group full">
@@ -696,7 +713,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.12";
+const CURRENT_VERSION = "1.0.13";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1097,8 +1114,10 @@ function closeModal() { document.getElementById("modalOverlay").classList.remove
 
 function confirmClear() {
   Object.keys(qty).forEach(id => { qty[id] = { cantidad: 0, caja: 0, pack: 0 }; });
-  ["solicitante","sector","observaciones"].forEach(id => document.getElementById(id).value = "");
+  ["solicitante","observaciones"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("sector").value = "";
   document.getElementById("prioridad").value = "Normal";
+  document.getElementById("equipo").value = "";
   document.getElementById("fecha").valueAsDate = new Date();
   document.getElementById("searchInput").value = "";
   renderSupplies("");
@@ -1220,6 +1239,7 @@ function _doExportPDF() {
   const fecha         = document.getElementById("fecha").value          || "—";
   const sector        = document.getElementById("sector").value         || "—";
   const prioridad     = document.getElementById("prioridad").value      || "Normal";
+  const equipo        = document.getElementById("equipo").value         || "—";
   const observaciones = document.getElementById("observaciones").value  || "";
 
   const W = 210, M = 14;
@@ -1264,47 +1284,62 @@ function _doExportPDF() {
   doc.setFontSize(7.5); doc.setTextColor(100, 155, 230);
   doc.text("Generado: " + new Date().toLocaleString("es-AR"), M + 52, 38);
 
-  // ── Info band (44–70mm) ──
+  // ── Info band (44–86mm, two rows) ──
   doc.setFillColor(237, 244, 255);
-  doc.rect(0, 44, W, 26, "F");
+  doc.rect(0, 44, W, 42, "F");
   doc.setFillColor(0, 122, 255);
-  doc.rect(0, 44, 4, 26, "F");
-  doc.setDrawColor(200, 218, 245);
-  doc.setLineWidth(0.4);
-  doc.line(0, 70, W, 70);
+  doc.rect(0, 44, 4, 42, "F");
 
+  // Row 1: Solicitante | Sector | Fecha
+  doc.setDrawColor(200, 218, 245); doc.setLineWidth(0.4);
   doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
-  doc.text("SOLICITANTE", M + 5, 52);
+  doc.text("SOLICITANTE", M + 5, 51);
   doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(solicitante).slice(0, 28), M + 5, 63);
+  doc.text(String(solicitante).slice(0, 28), M + 5, 61);
 
   doc.setDrawColor(195, 215, 245); doc.setLineWidth(0.5);
-  doc.line(89, 48, 89, 66);
+  doc.line(89, 47, 89, 66);
 
   doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
-  doc.text("SECTOR / SERVICIO", 93, 52);
+  doc.text("CENTRO", 93, 51);
   doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(sector).slice(0, 22), 93, 63);
+  doc.text(String(sector).slice(0, 22), 93, 61);
 
-  doc.setDrawColor(195, 215, 245);
-  doc.line(150, 48, 150, 66);
+  doc.line(150, 47, 150, 66);
 
   doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
-  doc.text("FECHA", 154, 52);
+  doc.text("FECHA", 154, 51);
   doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(fecha), 154, 63);
+  doc.text(String(fecha), 154, 61);
 
-  // Prioridad badge
+  // Horizontal divider between rows
+  doc.setDrawColor(200, 218, 245); doc.setLineWidth(0.4);
+  doc.line(4, 67, W, 67);
+
+  // Row 2: Equipo | (space) | Prioridad badge
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
+  doc.text("EQUIPO", M + 5, 74);
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
+  doc.text(String(equipo), M + 5, 84);
+
+  // Prioridad badge (row 2, right side)
   var pR = 0, pG = 165, pB = 88;
   if (prioridad === "Muy urgente") { pR = 218; pG = 38; pB = 28; }
   else if (prioridad === "Urgente") { pR = 220; pG = 125; pB = 0; }
   doc.setFillColor(pR, pG, pB);
-  doc.roundedRect(176, 50, 22, 12, 3, 3, "F");
-  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  doc.roundedRect(152, 71, 46, 16, 3, 3, "F");
+  doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
+  doc.text("PRIORIDAD", 175, 74);
+  doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
   var pLabel = prioridad === "Muy urgente" ? "MUY URG." : prioridad.toUpperCase();
-  doc.text(pLabel, 187, 57.5, { align: "center" });
+  doc.text(pLabel, 175, 83, { align: "center" });
 
-  // ── Table (starts at 75mm) ──
+  // Bottom border of info band
+  doc.setDrawColor(200, 218, 245); doc.setLineWidth(0.4);
+  doc.line(0, 86, W, 86);
+
+  // ── Table (starts at 91mm) ──
   var tableBody = [];
   var hasRows = false;
 
@@ -1339,11 +1374,11 @@ function _doExportPDF() {
   if (!hasRows) {
     doc.setFontSize(11); doc.setFont("helvetica", "normal");
     doc.setTextColor(170, 180, 205);
-    doc.text("No hay insumos seleccionados.", W / 2, 97, { align: "center" });
+    doc.text("No hay insumos seleccionados.", W / 2, 110, { align: "center" });
     _footer(1);
   } else {
     doc.autoTable({
-      startY: 75,
+      startY: 91,
       head: [["Cod.", "Descripcion del Insumo", "Cant.", "Caja", "Pack"]],
       body: tableBody,
       theme: "grid",

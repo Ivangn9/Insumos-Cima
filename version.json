@@ -1,5 +1,5 @@
 {
-  "version": "1.0.12",
+  "version": "1.0.13",
   "date": "2026-05-15",
-  "changelog": "Fix PDF: cat.name undefined - usar Object.entries en lugar de Object.values para obtener nombre de categoria"
+  "changelog": "Agregar campo Equipo (TC/RM/MG/RX/DMO/Ortopantomografia); cambiar Sector por Centro (GN/Pedernera/CRS); ambos campos reflejados en PDF"
 }
