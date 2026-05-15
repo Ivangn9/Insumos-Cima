@@ -577,7 +577,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.5</span>
+  <span id="versionLabel">V1.0.6</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -689,7 +689,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.5";
+const CURRENT_VERSION = "1.0.6";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const SUPPLIES = {
@@ -1181,7 +1181,15 @@ setInterval(async () => {
 }, 5 * 60 * 1000);
 
 // ─── Export PDF ──────────────────────────────────────────────────────────────
-async function exportPDF() {
+function exportPDF() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    toast("Librería PDF no cargada · Recargá la página");
+    return;
+  }
+  try { _doExportPDF(); } catch(e) { toast("Error al generar el PDF"); }
+}
+
+function _doExportPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -1329,30 +1337,33 @@ async function exportPDF() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-  if (isIOS) {
-    const blob = doc.output("blob");
-    // Web Share API con archivo (iOS 15+, requiere HTTPS)
-    if (navigator.share && navigator.canShare) {
-      try {
-        const file = new File([blob], fname, { type: "application/pdf" });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "Pedido de Insumos CIMA" });
-          toast("PDF compartido ✓");
-          return;
-        }
-      } catch (e) {
-        if (e.name === "AbortError") return; // usuario canceló
-      }
-    }
-    // Fallback: abrir en nueva pestaña para compartir desde Safari
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
-  } else {
+  if (!isIOS) {
     doc.save(fname);
     toast("PDF exportado exitosamente ✓");
+    return;
   }
+
+  // ── iOS: intentar Web Share API (funciona en iOS 15+ con HTTPS) ──
+  // Llamamos share como Promise (sin await) para no romper la cadena de gesto
+  const blob = doc.output("blob");
+  if (navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], fname, { type: "application/pdf" });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: "Pedido de Insumos CIMA" })
+          .then(() => toast("PDF listo ✓"))
+          .catch(e => { if (e.name !== "AbortError") _iosFallback(doc, fname); });
+        return;
+      }
+    } catch (_) { /* seguir al fallback */ }
+  }
+  _iosFallback(doc, fname);
+}
+
+function _iosFallback(doc, fname) {
+  // dataurlnewwindow usa un form POST para bypassear el bloqueador de popups
+  doc.output("dataurlnewwindow", { filename: fname });
+  toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
 }
 </script>
 </body>
