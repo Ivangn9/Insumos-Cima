@@ -1,5 +1,5 @@
 {
-  "version": "1.0.10",
+  "version": "1.0.11",
   "date": "2026-05-15",
-  "changelog": "Fix error PDF en iOS: eliminar caracter Unicode incompatible con fuente Helvetica de jsPDF"
+  "changelog": "Fix PDF iOS: eliminar colSpan, cellPadding objeto, addImage y chars fuera de WinAnsi; mostrar error especifico en toast"
 }

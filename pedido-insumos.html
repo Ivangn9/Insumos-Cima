@@ -584,7 +584,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.10</span>
+  <span id="versionLabel">V1.0.11</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -696,7 +696,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.10";
+const CURRENT_VERSION = "1.0.11";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1209,7 +1209,7 @@ function exportPDF() {
     toast("Librería PDF no cargada · Recargá la página");
     return;
   }
-  try { _doExportPDF(); } catch(e) { toast("Error al generar el PDF"); }
+  try { _doExportPDF(); } catch(e) { toast("Error PDF: " + (e.message || String(e)).slice(0,50)); }
 }
 
 function _doExportPDF() {
@@ -1224,221 +1224,192 @@ function _doExportPDF() {
 
   const W = 210, M = 14;
 
-  // ── Reusable page elements ──
-  function _drawWatermark() {
-    const cx = W / 2, cy = 158, bw = 88, bh = 25;
-    doc.setFillColor(228, 238, 255);
-    doc.roundedRect(cx - bw/2, cy - bh/2, bw, bh, 5, 5, "F");
-    doc.roundedRect(cx - bh/2, cy - bw/2, bh, bw, 5, 5, "F");
-  }
+  // ── Watermark cross (page 1 background) ──
+  var cx = W / 2, cy = 158, bw = 88, bh = 24;
+  doc.setFillColor(230, 240, 255);
+  doc.roundedRect(cx - bw/2, cy - bh/2, bw, bh, 5, 5, "F");
+  doc.roundedRect(cx - bh/2, cy - bw/2, bh, bw, 5, 5, "F");
 
-  function _drawMiniHeader() {
-    doc.setFillColor(5, 22, 68);
-    doc.rect(0, 0, W, 14, "F");
-    doc.setFillColor(0, 122, 255);
-    doc.rect(0, 0, W, 2.5, "F");
-    const lx = _pdfLogoB64 ? M + 26 : M + 16;
-    if (_pdfLogoB64) doc.addImage(_pdfLogoB64, "PNG", M, 3, 22, 9, "", "FAST");
-    doc.setFontSize(8.5); doc.setFont("helvetica","bold");
-    doc.setTextColor(255,255,255);
-    doc.text("PEDIDO DE INSUMOS", lx, 9.5);
-    doc.setFontSize(7); doc.setFont("helvetica","normal");
-    doc.setTextColor(140, 185, 255);
-    doc.text("CIMA · Insumos Hospitalarios", lx + 57, 9.5);
-  }
+  // ── Header (dark navy, 0–44mm) ──
+  doc.setFillColor(5, 22, 68);
+  doc.rect(0, 0, W, 44, "F");
+  doc.setFillColor(0, 122, 255);
+  doc.rect(0, 0, W, 3, "F");
 
-  function _drawFooter(pageNum) {
-    const pH = doc.internal.pageSize.height;
+  // Decorative cross top-right
+  doc.setFillColor(18, 52, 120);
+  doc.roundedRect(177, 14, 24, 7, 2, 2, "F");
+  doc.roundedRect(185.5, 7, 7, 24, 2, 2, "F");
+  doc.setFillColor(28, 72, 160);
+  doc.roundedRect(177.5, 14.5, 23, 6, 1.5, 1.5, "F");
+  doc.roundedRect(186, 7.5, 6, 23, 1.5, 1.5, "F");
+
+  // White CIMA card (left)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(M, 8, 46, 28, 4, 4, "F");
+  doc.setFontSize(11); doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 80, 200);
+  doc.text("CIMA", M + 23, 23, { align: "center" });
+  doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 140, 210);
+  doc.text("Insumos Med.", M + 23, 29, { align: "center" });
+
+  // Title
+  doc.setFontSize(17); doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text("PEDIDO DE INSUMOS", M + 52, 20);
+  doc.setFontSize(8.5); doc.setFont("helvetica", "normal");
+  doc.setTextColor(140, 190, 255);
+  doc.text("Sistema de Gestion de Insumos Hospitalarios", M + 52, 29);
+  doc.setFontSize(7.5); doc.setTextColor(100, 155, 230);
+  doc.text("Generado: " + new Date().toLocaleString("es-AR"), M + 52, 38);
+
+  // ── Info band (44–70mm) ──
+  doc.setFillColor(237, 244, 255);
+  doc.rect(0, 44, W, 26, "F");
+  doc.setFillColor(0, 122, 255);
+  doc.rect(0, 44, 4, 26, "F");
+  doc.setDrawColor(200, 218, 245);
+  doc.setLineWidth(0.4);
+  doc.line(0, 70, W, 70);
+
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
+  doc.text("SOLICITANTE", M + 5, 52);
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
+  doc.text(String(solicitante).slice(0, 28), M + 5, 63);
+
+  doc.setDrawColor(195, 215, 245); doc.setLineWidth(0.5);
+  doc.line(89, 48, 89, 66);
+
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
+  doc.text("SECTOR / SERVICIO", 93, 52);
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
+  doc.text(String(sector).slice(0, 22), 93, 63);
+
+  doc.setDrawColor(195, 215, 245);
+  doc.line(150, 48, 150, 66);
+
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(95, 128, 175);
+  doc.text("FECHA", 154, 52);
+  doc.setFontSize(9.5); doc.setFont("helvetica", "normal"); doc.setTextColor(15, 28, 60);
+  doc.text(String(fecha), 154, 63);
+
+  // Prioridad badge
+  var pR = 0, pG = 165, pB = 88;
+  if (prioridad === "Muy urgente") { pR = 218; pG = 38; pB = 28; }
+  else if (prioridad === "Urgente") { pR = 220; pG = 125; pB = 0; }
+  doc.setFillColor(pR, pG, pB);
+  doc.roundedRect(176, 50, 22, 12, 3, 3, "F");
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  var pLabel = prioridad === "Muy urgente" ? "MUY URG." : prioridad.toUpperCase();
+  doc.text(pLabel, 187, 57.5, { align: "center" });
+
+  // ── Table (starts at 75mm) ──
+  var tableBody = [];
+  var hasRows = false;
+
+  Object.values(SUPPLIES).forEach(function(cat) {
+    var catItems = cat.items.filter(function(item) { return hasQty(item.id); });
+    if (catItems.length === 0) return;
+    hasRows = true;
+    // Category separator row: marker in col 0, name in col 1, empty in rest
+    tableBody.push(["###C", cat.name.toUpperCase(), "", "", ""]);
+    catItems.forEach(function(item) {
+      var q = qty[item.id];
+      tableBody.push([item.code, item.name, q.cantidad || "—", q.caja || "—", q.pack || "—"]);
+    });
+  });
+
+  // Footer helper (defined before use inside didDrawPage)
+  function _footer(n) {
+    var pH = doc.internal.pageSize.height;
     doc.setFillColor(5, 22, 68);
     doc.rect(0, pH - 13, W, 13, "F");
     doc.setFillColor(0, 122, 255);
     doc.rect(0, pH - 13, W, 1.5, "F");
-    doc.setFontSize(7); doc.setFont("helvetica","normal");
+    doc.setFontSize(7); doc.setFont("helvetica", "normal");
     doc.setTextColor(130, 180, 255);
-    doc.text("CIMA · Sistema de Gestión de Insumos Hospitalarios", M, pH - 4.5);
-    doc.setTextColor(255,255,255);
-    doc.text("Pág. " + pageNum, W - M, pH - 4.5, { align: "right" });
+    doc.text("CIMA - Sistema de Gestion de Insumos Hospitalarios", M, pH - 4.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Pag. " + n, W - M, pH - 4.5, { align: "right" });
   }
-
-  // ── Page 1: watermark (behind everything) ──
-  _drawWatermark();
-
-  // ── Main Header (dark navy, 44mm) ──
-  const HDR_H = 44;
-  doc.setFillColor(5, 22, 68);
-  doc.rect(0, 0, W, HDR_H, "F");
-  doc.setFillColor(0, 122, 255);
-  doc.rect(0, 0, W, 3, "F");
-
-  // Decorative medical cross (top-right corner, dark blue tone)
-  const crx = 177, cry = 7;
-  doc.setFillColor(18, 52, 120);
-  doc.roundedRect(crx, cry + 7.5, 24, 7.5, 2, 2, "F");
-  doc.roundedRect(crx + 8.5, cry, 7.5, 24, 2, 2, "F");
-  doc.setFillColor(28, 72, 160);
-  doc.roundedRect(crx + 0.5, cry + 8, 23, 6.5, 1.5, 1.5, "F");
-  doc.roundedRect(crx + 9, cry + 0.5, 6.5, 23, 1.5, 1.5, "F");
-
-  // White card for logo
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(M, 8, 46, 28, 4, 4, "F");
-  if (_pdfLogoB64) {
-    doc.addImage(_pdfLogoB64, "PNG", M + 3, 11, 40, 22, "", "FAST");
-  } else {
-    doc.setFontSize(13); doc.setFont("helvetica","bold");
-    doc.setTextColor(0, 80, 200);
-    doc.text("CIMA", M + 23, 25, { align: "center" });
-  }
-
-  // Title text (right of logo card)
-  const ttx = M + 52;
-  doc.setFontSize(17); doc.setFont("helvetica","bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text("PEDIDO DE INSUMOS", ttx, 21);
-  doc.setFontSize(8.5); doc.setFont("helvetica","normal");
-  doc.setTextColor(140, 190, 255);
-  doc.text("Sistema de Gestión de Insumos Hospitalarios", ttx, 30);
-  doc.setFontSize(7.5); doc.setTextColor(100, 155, 230);
-  doc.text("Generado: " + new Date().toLocaleString("es-AR"), ttx, 38);
-
-  // ── Info band (44–70mm) ──
-  const INFO_Y = HDR_H, INFO_H = 26;
-  doc.setFillColor(237, 244, 255);
-  doc.rect(0, INFO_Y, W, INFO_H, "F");
-  doc.setFillColor(0, 122, 255);
-  doc.rect(0, INFO_Y, 4, INFO_H, "F");
-  doc.setDrawColor(200, 218, 245);
-  doc.setLineWidth(0.4);
-  doc.line(0, INFO_Y + INFO_H, W, INFO_Y + INFO_H);
-
-  const LY = INFO_Y + 8.5, VY = INFO_Y + 19;
-
-  // Field: Solicitante
-  doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(95, 128, 175);
-  doc.text("SOLICITANTE", M + 5, LY);
-  doc.setFontSize(9.5); doc.setFont("helvetica","normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(solicitante).slice(0, 28), M + 5, VY);
-
-  doc.setDrawColor(195, 215, 245); doc.setLineWidth(0.5);
-  doc.line(89, INFO_Y + 4, 89, INFO_Y + INFO_H - 4);
-
-  // Field: Sector
-  doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(95, 128, 175);
-  doc.text("SECTOR / SERVICIO", 93, LY);
-  doc.setFontSize(9.5); doc.setFont("helvetica","normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(sector).slice(0, 22), 93, VY);
-
-  doc.setDrawColor(195, 215, 245);
-  doc.line(150, INFO_Y + 4, 150, INFO_Y + INFO_H - 4);
-
-  // Field: Fecha
-  doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(95, 128, 175);
-  doc.text("FECHA", 154, LY);
-  doc.setFontSize(9.5); doc.setFont("helvetica","normal"); doc.setTextColor(15, 28, 60);
-  doc.text(String(fecha), 154, VY);
-
-  // Prioridad badge
-  const pColors = { "Muy urgente":[218,38,28], "Urgente":[220,125,0], "Normal":[0,165,88] };
-  doc.setFillColor(...(pColors[prioridad] || pColors["Normal"]));
-  doc.roundedRect(176, INFO_Y + 6.5, 22, 12, 3, 3, "F");
-  doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(255,255,255);
-  const pLabel = prioridad === "Muy urgente" ? "MUY URG." : prioridad.toUpperCase();
-  doc.text(pLabel, 187, INFO_Y + 14, { align: "center" });
-
-  // ── Table ──
-  const TABLE_Y = INFO_Y + INFO_H + 5;
-  const tableBody = [];
-  let hasRows = false;
-
-  Object.values(SUPPLIES).forEach(cat => {
-    const catItems = cat.items.filter(item => hasQty(item.id));
-    if (catItems.length === 0) return;
-    hasRows = true;
-    tableBody.push([{
-      content: "    " + cat.name.toUpperCase(),
-      colSpan: 5,
-      styles: {
-        fillColor: [10, 50, 140],
-        textColor: [200, 225, 255],
-        fontStyle: "bold",
-        fontSize: 7.5,
-        cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 3 },
-      }
-    }]);
-    catItems.forEach(item => {
-      const q = qty[item.id];
-      tableBody.push([ item.code, item.name, q.cantidad||"—", q.caja||"—", q.pack||"—" ]);
-    });
-  });
 
   if (!hasRows) {
-    doc.setFontSize(11); doc.setFont("helvetica","normal");
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
     doc.setTextColor(170, 180, 205);
-    doc.text("No hay insumos seleccionados.", W / 2, TABLE_Y + 22, { align: "center" });
-    _drawFooter(1);
+    doc.text("No hay insumos seleccionados.", W / 2, 97, { align: "center" });
+    _footer(1);
   } else {
     doc.autoTable({
-      startY: TABLE_Y,
-      head: [["Código", "Descripción del Insumo", "Cant.", "Caja", "Pack"]],
+      startY: 75,
+      head: [["Cod.", "Descripcion del Insumo", "Cant.", "Caja", "Pack"]],
       body: tableBody,
-      theme: "plain",
+      theme: "grid",
       headStyles: {
         fillColor: [0, 48, 140],
         textColor: 255,
         fontStyle: "bold",
         fontSize: 8.5,
-        cellPadding: { top: 4, bottom: 4, left: 4, right: 2 },
+        cellPadding: 4,
       },
       bodyStyles: {
         fontSize: 8.5,
         textColor: [22, 33, 62],
-        cellPadding: { top: 3, bottom: 3, left: 4, right: 2 },
-        lineColor: [210, 225, 248],
-        lineWidth: 0.25,
+        cellPadding: 3,
       },
       alternateRowStyles: { fillColor: [246, 251, 255] },
       columnStyles: {
-        0: { cellWidth: 22, fontStyle: "bold", textColor: [55, 100, 205] },
+        0: { cellWidth: 20, fontStyle: "bold", textColor: [55, 100, 205] },
         2: { cellWidth: 18, halign: "center" },
         3: { cellWidth: 18, halign: "center" },
         4: { cellWidth: 18, halign: "center" },
       },
       margin: { left: M, right: M, top: 16, bottom: 15 },
-      didParseCell(data) {
-        if (data.section === "body" && data.column.index >= 2) {
-          const v = data.cell.raw;
+      didParseCell: function(data) {
+        if (data.row.raw[0] === "###C") {
+          data.cell.styles.fillColor = [10, 50, 140];
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fontSize = 7.5;
+          data.cell.styles.cellPadding = 3.5;
+          if (data.column.index === 1) {
+            data.cell.styles.textColor = [200, 225, 255];
+          } else {
+            data.cell.styles.textColor = [10, 50, 140];
+            data.cell.text = [""];
+          }
+        } else if (data.section === "body" && data.column.index >= 2) {
+          var v = data.cell.raw;
           if (v !== "—" && v !== "" && Number(v) > 0) {
             data.cell.styles.textColor = [0, 92, 220];
             data.cell.styles.fontStyle = "bold";
           }
         }
       },
-      didDrawPage(pageData) {
-        if (pageData.pageNumber > 1) { _drawWatermark(); _drawMiniHeader(); }
-        _drawFooter(pageData.pageNumber);
+      didDrawPage: function(pageData) {
+        _footer(pageData.pageNumber);
       },
     });
-  }
 
-  // ── Observations ──
-  const finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : TABLE_Y) + 8;
-  if (observaciones.trim()) {
-    const pH2 = doc.internal.pageSize.height;
-    if (finalY + 22 < pH2 - 16) {
-      doc.setFillColor(237, 244, 255);
-      doc.roundedRect(M, finalY, W - 2*M, 8, 2.5, 2.5, "F");
-      doc.setFillColor(0, 122, 255);
-      doc.roundedRect(M, finalY, 3.5, 8, 1.5, 1.5, "F");
-      doc.setFontSize(6.5); doc.setFont("helvetica","bold"); doc.setTextColor(80, 120, 195);
-      doc.text("OBSERVACIONES", M + 7, finalY + 5.5);
-      doc.setFont("helvetica","normal");
-      doc.setFontSize(9); doc.setTextColor(28, 40, 70);
-      const lines = doc.splitTextToSize(observaciones, W - 2*M - 9);
-      doc.text(lines, M + 7, finalY + 14);
+    // ── Observations ──
+    var finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 75) + 8;
+    if (observaciones.trim()) {
+      var pH2 = doc.internal.pageSize.height;
+      if (finalY + 22 < pH2 - 16) {
+        doc.setFillColor(237, 244, 255);
+        doc.roundedRect(M, finalY, W - 2*M, 8, 2.5, 2.5, "F");
+        doc.setFillColor(0, 122, 255);
+        doc.roundedRect(M, finalY, 3.5, 8, 1.5, 1.5, "F");
+        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 120, 195);
+        doc.text("OBSERVACIONES", M + 7, finalY + 5.5);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9); doc.setTextColor(28, 40, 70);
+        var obsLines = doc.splitTextToSize(observaciones, W - 2*M - 9);
+        doc.text(obsLines, M + 7, finalY + 14);
+      }
     }
   }
 
-  const fname = `Pedido_Insumos_${fecha.replace(/-/g,"")}_${solicitante.split(" ")[0]||"CIMA"}.pdf`;
+  var fname = "Pedido_Insumos_" + fecha.replace(/-/g, "") + "_" + (solicitante.split(" ")[0] || "CIMA") + ".pdf";
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
