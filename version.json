@@ -1,5 +1,5 @@
 {
-  "version": "1.0.14",
+  "version": "1.0.15",
   "date": "2026-05-15",
-  "changelog": "Agregar insumo manualmente: modal + seccion Insumos Adicionales; nuevos items Clip de biopsia y Arpon en Puncion"
+  "changelog": "Mover boton Agregar insumo manualmente a la parte superior"
 }
