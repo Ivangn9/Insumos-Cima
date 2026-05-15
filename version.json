@@ -1,5 +1,5 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.8",
   "date": "2026-05-15",
-  "changelog": "Fix error al generar PDF: eliminar setGlobalAlpha incompatible con jsPDF 2.5.1"
+  "changelog": "Agregar logo CIMA en topbar y header; PWA manifest con ícono médico para escritorio"
 }

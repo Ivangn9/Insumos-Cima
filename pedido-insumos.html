@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="CIMA Insumos" />
+  <meta name="theme-color" content="#007AFF" />
+  <link rel="manifest" href="manifest.json" />
   <title>Pedido de Insumos · CIMA</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -110,11 +113,14 @@
     .brand-icon {
       width: 54px; height: 54px;
       border-radius: 16px;
-      background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%);
-      box-shadow: 0 4px 18px rgba(0,122,255,0.38), inset 0 1px 0 rgba(255,255,255,0.3);
+      background: white;
+      box-shadow: 0 4px 18px rgba(0,122,255,0.20), inset 0 1px 0 rgba(255,255,255,0.3);
       display: flex; align-items: center; justify-content: center;
       font-size: 28px; flex-shrink: 0;
+      overflow: hidden;
+      padding: 6px;
     }
+    .brand-icon img { width: 100%; height: 100%; object-fit: contain; }
 
     .brand-text h1 {
       font-size: 21px; font-weight: 750; letter-spacing: -0.6px;
@@ -476,6 +482,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.10);
     }
     .topbar-logo { font-size: 14px; }
+    .topbar-logo-img { height: 22px; width: auto; object-fit: contain; flex-shrink: 0; }
     .topbar-name {
       font-size: 12px; font-weight: 600;
       color: rgba(255,255,255,0.55);
@@ -573,11 +580,11 @@
 
 <!-- ─── Top version bar (fixed, outside page) ────────── -->
 <div class="topbar">
-  <span class="topbar-logo">🏥</span>
+  <img src="logo.png" class="topbar-logo-img" alt="CIMA" />
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.7</span>
+  <span id="versionLabel">V1.0.8</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -592,7 +599,7 @@
   <!-- Header -->
   <header class="header glass">
     <div class="header-brand">
-      <div class="brand-icon">🏥</div>
+      <div class="brand-icon"><img src="logo.png" alt="CIMA" /></div>
       <div class="brand-text">
         <h1>Pedido de Insumos</h1>
         <p>CIMA · Sistema de Gestión</p>
@@ -689,7 +696,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.7";
+const CURRENT_VERSION = "1.0.8";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const SUPPLIES = {

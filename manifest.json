@@ -1,0 +1,24 @@
+{
+  "name": "Pedido de Insumos · CIMA",
+  "short_name": "CIMA Insumos",
+  "description": "Sistema de gestión de pedidos de insumos hospitalarios",
+  "start_url": "./pedido-insumos.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#007AFF",
+  "background_color": "#007AFF",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

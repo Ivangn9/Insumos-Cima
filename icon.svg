@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#5AC8FA"/>
+      <stop offset="50%"  stop-color="#007AFF"/>
+      <stop offset="100%" stop-color="#0040DD"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="shape">
+      <rect width="1024" height="1024" rx="224" ry="224"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+
+  <!-- Top shine -->
+  <rect width="1024" height="560" rx="224" ry="224" fill="url(#shine)" clip-path="url(#shape)"/>
+
+  <!-- Medical kit box body -->
+  <rect x="192" y="340" width="640" height="440" rx="72" ry="72" fill="white" opacity="0.95"/>
+
+  <!-- Kit handle -->
+  <rect x="352" y="256" width="320" height="140" rx="48" ry="48" fill="white" opacity="0.95"/>
+  <rect x="392" y="280" width="240" height="92" rx="34" ry="34" fill="url(#bg)"/>
+
+  <!-- Red cross on kit -->
+  <rect x="462" y="390" width="100" height="288" rx="28" ry="28" fill="#FF3B30"/>
+  <rect x="318" y="490" width="388" height="100" rx="28" ry="28" fill="#FF3B30"/>
+
+  <!-- Corner dots (pills) -->
+  <circle cx="168" cy="168" r="44" fill="rgba(255,255,255,0.18)"/>
+  <circle cx="856" cy="168" r="32" fill="rgba(255,255,255,0.14)"/>
+  <circle cx="168" cy="856" r="32" fill="rgba(255,255,255,0.14)"/>
+  <circle cx="856" cy="856" r="44" fill="rgba(255,255,255,0.18)"/>
+</svg>
