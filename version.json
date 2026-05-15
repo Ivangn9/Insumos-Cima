@@ -1,5 +1,5 @@
 {
-  "version": "1.0.11",
+  "version": "1.0.12",
   "date": "2026-05-15",
-  "changelog": "Fix PDF iOS: eliminar colSpan, cellPadding objeto, addImage y chars fuera de WinAnsi; mostrar error especifico en toast"
+  "changelog": "Fix PDF: cat.name undefined - usar Object.entries en lugar de Object.values para obtener nombre de categoria"
 }

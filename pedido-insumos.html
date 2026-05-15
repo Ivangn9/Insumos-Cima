@@ -584,7 +584,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.11</span>
+  <span id="versionLabel">V1.0.12</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -696,7 +696,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.11";
+const CURRENT_VERSION = "1.0.12";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1308,12 +1308,14 @@ function _doExportPDF() {
   var tableBody = [];
   var hasRows = false;
 
-  Object.values(SUPPLIES).forEach(function(cat) {
+  Object.entries(SUPPLIES).forEach(function(entry) {
+    var catName = entry[0];
+    var cat = entry[1];
     var catItems = cat.items.filter(function(item) { return hasQty(item.id); });
     if (catItems.length === 0) return;
     hasRows = true;
     // Category separator row: marker in col 0, name in col 1, empty in rest
-    tableBody.push(["###C", cat.name.toUpperCase(), "", "", ""]);
+    tableBody.push(["###C", catName.toUpperCase(), "", "", ""]);
     catItems.forEach(function(item) {
       var q = qty[item.id];
       tableBody.push([item.code, item.name, q.cantidad || "—", q.caja || "—", q.pack || "—"]);
