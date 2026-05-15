@@ -1,5 +1,5 @@
 {
-  "version": "1.0.4",
+  "version": "1.0.5",
   "date": "2026-05-15",
-  "changelog": "Topbar fijo en tope + PDF con share nativo iOS"
+  "changelog": "Auto-actualización cada 5 minutos"
 }
