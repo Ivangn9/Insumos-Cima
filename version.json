@@ -1,5 +1,5 @@
 {
-  "version": "1.0.9",
+  "version": "1.0.10",
   "date": "2026-05-15",
-  "changelog": "PDF rediseñado: logo CIMA, cabecera naval, marca de agua, separadores por categoría, pie con paginación, soporte multipágina"
+  "changelog": "Fix error PDF en iOS: eliminar caracter Unicode incompatible con fuente Helvetica de jsPDF"
 }
