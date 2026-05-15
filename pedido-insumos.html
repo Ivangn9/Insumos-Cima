@@ -577,7 +577,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.6</span>
+  <span id="versionLabel">V1.0.7</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -689,7 +689,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.6";
+const CURRENT_VERSION = "1.0.7";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const SUPPLIES = {
@@ -1204,15 +1204,6 @@ function _doExportPDF() {
   // ── Header band ──
   doc.setFillColor(0, 122, 255);
   doc.rect(0, 0, W, 32, "F");
-
-  // Watermark cross on header
-  doc.setFillColor(255,255,255);
-  doc.setGlobalAlpha(0.08);
-  for (let x = 160; x < W; x += 18) {
-    doc.rect(x,    6,  6, 20, "F");
-    doc.rect(x-7, 13, 20,  6, "F");
-  }
-  doc.setGlobalAlpha(1);
 
   doc.setTextColor(255,255,255);
   doc.setFontSize(19); doc.setFont("helvetica","bold");

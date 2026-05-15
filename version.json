@@ -1,5 +1,5 @@
 {
-  "version": "1.0.6",
+  "version": "1.0.7",
   "date": "2026-05-15",
-  "changelog": "Fix exportar PDF en iOS: función síncrona + share API sin await"
+  "changelog": "Fix error al generar PDF: eliminar setGlobalAlpha incompatible con jsPDF 2.5.1"
 }
