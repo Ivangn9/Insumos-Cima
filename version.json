@@ -1,5 +1,5 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "date": "2026-05-15",
-  "changelog": "Auto-actualización cada 5 minutos"
+  "changelog": "Fix exportar PDF en iOS: función síncrona + share API sin await"
 }
