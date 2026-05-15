@@ -463,6 +463,39 @@
     .modal-desc { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions .btn { flex: 1; justify-content: center; }
+    .modal-input {
+      width: 100%; padding: 11px 14px; margin-bottom: 16px;
+      background: rgba(255,255,255,0.50);
+      border: 1px solid rgba(255,255,255,0.70);
+      border-radius: var(--r-md);
+      font-size: 15px; font-family: inherit; color: var(--text-primary);
+      outline: none;
+    }
+    .modal-input:focus { border-color: rgba(0,122,255,0.45); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); }
+
+    /* ─── Add-manual button ─────────────────────────── */
+    .btn-add-manual {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 13px 20px; margin-top: 12px;
+      background: rgba(0,122,255,0.08);
+      border: 1.5px dashed rgba(0,122,255,0.30);
+      border-radius: var(--r-lg);
+      font-size: 14px; font-weight: 620; color: var(--blue);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-add-manual:active { background: rgba(0,122,255,0.14); }
+
+    /* ─── Custom item row delete btn ───────────────── */
+    .ctr-del {
+      width: 28px; height: 28px; border-radius: 50%; border: none;
+      background: rgba(255,59,48,0.10); color: var(--red);
+      font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    }
+    .ctr-del:active { background: rgba(255,59,48,0.22); }
 
     .btn-ghost {
       background: rgba(120,120,140,0.10);
@@ -578,13 +611,29 @@
   </div>
 </div>
 
+<!-- ─── Custom item modal ───────────────────────────── -->
+<div class="modal-overlay" id="addManualOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">✏️</div>
+    <div class="modal-title">Agregar insumo</div>
+    <div class="modal-desc">Ingresá el nombre del insumo a agregar al pedido.</div>
+    <input class="modal-input" type="text" id="customItemName"
+           placeholder="Nombre del insumo…" maxlength="80"
+           onkeydown="if(event.key==='Enter')confirmAddManual()" />
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAddManual()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddManual()">Agregar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Top version bar (fixed, outside page) ────────── -->
 <div class="topbar">
   <img src="logo.png" class="topbar-logo-img" alt="CIMA" />
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.13</span>
+  <span id="versionLabel">V1.0.14</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -708,12 +757,17 @@
   <!-- Supplies -->
   <div id="suppliesContainer"></div>
 
+  <!-- Add manually button -->
+  <button class="btn-add-manual" onclick="openAddManual()">
+    <span style="font-size:18px;line-height:1">+</span> Agregar insumo manualmente
+  </button>
+
   <div class="footer">CIMA · Sistema de Pedido de Insumos · 2026</div>
 </div>
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.13";
+const CURRENT_VERSION = "1.0.14";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -864,6 +918,8 @@ const SUPPLIES = {
       { id: "pun020", name: "Bisturí N°15",                                       code: "PUN-020" },
       { id: "pun021", name: "Bisturí N°22",                                       code: "PUN-021" },
       { id: "pun022", name: "Porta Objetos (×50un)",                              code: "PUN-022" },
+      { id: "pun023", name: "Clip de biopsia",                                     code: "PUN-023" },
+      { id: "pun024", name: "Arpón",                                               code: "PUN-024" },
     ]
   },
   "Medicamentos": {
@@ -977,6 +1033,9 @@ Object.values(SUPPLIES).forEach(cat =>
   cat.items.forEach(item => { qty[item.id] = { cantidad: 0, caja: 0, pack: 0 }; })
 );
 
+let customItems = [];
+let _customSeq = 0;
+
 // ─── Init ───────────────────────────────────────────────────────────────────
 document.getElementById("fecha").valueAsDate = new Date();
 renderAll();
@@ -1039,6 +1098,52 @@ function renderSupplies(filter) {
     block.appendChild(card);
     container.appendChild(block);
   });
+
+  // ── Custom items section ──
+  const filteredCustom = customItems.filter(item =>
+    !q || item.name.toLowerCase().includes(q)
+  );
+  if (filteredCustom.length > 0) {
+    anyResult = true;
+    const cblock = document.createElement("div");
+    cblock.className = "category-block";
+    cblock.innerHTML = `
+      <div class="cat-header">
+        <div class="cat-icon-wrap" style="background:rgba(255,149,0,0.12)">📝</div>
+        <span class="cat-title">Insumos Adicionales</span>
+      </div>
+      <div class="col-heads">
+        <span class="col-head">Cantidad</span>
+        <span class="col-head">Caja</span>
+        <span class="col-head">Pack</span>
+      </div>
+    `;
+    const ccard = document.createElement("div");
+    ccard.className = "supply-card glass";
+    filteredCustom.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "supply-row" + (hasQty(item.id) ? " active-row" : "");
+      row.id = "row-" + item.id;
+      row.innerHTML = `
+        <div class="supply-info">
+          <div class="supply-ico" style="background:rgba(255,149,0,0.12)">📝</div>
+          <div class="supply-text">
+            <div class="supply-name">${escHtml(item.name)}</div>
+            <div class="supply-code">${item.code}</div>
+          </div>
+        </div>
+        <div class="counters">
+          ${mkCtr(item.id, "cantidad", "UND")}
+          ${mkCtr(item.id, "caja",     "CAJA")}
+          ${mkCtr(item.id, "pack",     "PACK")}
+          <button class="ctr-del" onclick="deleteCustomItem('${item.id}')" title="Eliminar">×</button>
+        </div>
+      `;
+      ccard.appendChild(row);
+    });
+    cblock.appendChild(ccard);
+    container.insertBefore(cblock, container.firstChild);
+  }
 
   if (!anyResult) {
     container.innerHTML = `
@@ -1112,8 +1217,34 @@ function filterSupplies() {
 function openModal()  { document.getElementById("modalOverlay").classList.add("open"); }
 function closeModal() { document.getElementById("modalOverlay").classList.remove("open"); }
 
+// ─── Custom item modal ───────────────────────────────────────────────────────
+function openAddManual() {
+  document.getElementById("customItemName").value = "";
+  document.getElementById("addManualOverlay").classList.add("open");
+  setTimeout(() => document.getElementById("customItemName").focus(), 80);
+}
+function closeAddManual() {
+  document.getElementById("addManualOverlay").classList.remove("open");
+}
+function confirmAddManual() {
+  const name = document.getElementById("customItemName").value.trim();
+  if (!name) { document.getElementById("customItemName").focus(); return; }
+  const id = "cust_" + (++_customSeq);
+  customItems.push({ id, name, code: "ADIC-" + String(_customSeq).padStart(3, "0") });
+  qty[id] = { cantidad: 0, caja: 0, pack: 0 };
+  closeAddManual();
+  renderSupplies(document.getElementById("searchInput").value);
+}
+function deleteCustomItem(id) {
+  customItems = customItems.filter(item => item.id !== id);
+  delete qty[id];
+  renderSupplies(document.getElementById("searchInput").value);
+  refreshStats();
+}
+
 function confirmClear() {
   Object.keys(qty).forEach(id => { qty[id] = { cantidad: 0, caja: 0, pack: 0 }; });
+  customItems = []; _customSeq = 0;
   ["solicitante","observaciones"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("sector").value = "";
   document.getElementById("prioridad").value = "Normal";
@@ -1349,13 +1480,23 @@ function _doExportPDF() {
     var catItems = cat.items.filter(function(item) { return hasQty(item.id); });
     if (catItems.length === 0) return;
     hasRows = true;
-    // Category separator row: marker in col 0, name in col 1, empty in rest
     tableBody.push(["###C", catName.toUpperCase(), "", "", ""]);
     catItems.forEach(function(item) {
       var q = qty[item.id];
       tableBody.push([item.code, item.name, q.cantidad || "—", q.caja || "—", q.pack || "—"]);
     });
   });
+
+  // Custom items
+  var customWithQty = customItems.filter(function(item) { return hasQty(item.id); });
+  if (customWithQty.length > 0) {
+    hasRows = true;
+    tableBody.push(["###C", "INSUMOS ADICIONALES", "", "", ""]);
+    customWithQty.forEach(function(item) {
+      var q = qty[item.id];
+      tableBody.push([item.code, item.name, q.cantidad || "—", q.caja || "—", q.pack || "—"]);
+    });
+  }
 
   // Footer helper (defined before use inside didDrawPage)
   function _footer(n) {

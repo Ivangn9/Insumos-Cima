@@ -1,5 +1,5 @@
 {
-  "version": "1.0.13",
+  "version": "1.0.14",
   "date": "2026-05-15",
-  "changelog": "Agregar campo Equipo (TC/RM/MG/RX/DMO/Ortopantomografia); cambiar Sector por Centro (GN/Pedernera/CRS); ambos campos reflejados en PDF"
+  "changelog": "Agregar insumo manualmente: modal + seccion Insumos Adicionales; nuevos items Clip de biopsia y Arpon en Puncion"
 }
