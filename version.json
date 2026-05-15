@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "date": "2026-05-15",
-  "changelog": "Fix layout móvil del header y PDF en iOS"
+  "changelog": "Versión visible en barra superior fija"
 }
