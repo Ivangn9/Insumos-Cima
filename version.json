@@ -1,5 +1,5 @@
 {
-  "version": "1.0.16",
+  "version": "1.0.17",
   "date": "2026-05-15",
-  "changelog": "Boton Compartir: envia resumen del pedido por WhatsApp, email o cualquier app via panel nativo"
+  "changelog": "Compartir envia el PDF como archivo (no texto); usa Web Share API con file attachment"
 }

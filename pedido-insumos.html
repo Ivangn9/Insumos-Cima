@@ -662,7 +662,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.16</span>
+  <span id="versionLabel">V1.0.17</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -799,7 +799,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.16";
+const CURRENT_VERSION = "1.0.17";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1307,23 +1307,53 @@ function buildOrderText() {
 }
 
 function shareOrder() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    toast("Librería PDF no cargada · Recargá la página"); return;
+  }
   const allItems = Object.values(SUPPLIES).flatMap(function(c) { return c.items; })
     .concat(customItems).filter(function(item) { return hasQty(item.id); });
   if (!allItems.length) { toast("No hay insumos seleccionados"); return; }
 
+  var result;
+  try { result = _buildPDF(); } catch(e) { toast("Error al generar PDF: " + (e.message||"").slice(0,40)); return; }
+  var doc = result.doc, fname = result.fname;
+  var blob = doc.output("blob");
+  var title = "Pedido de Insumos CIMA";
+
+  // Intentar compartir como archivo PDF (iOS 15+, Android)
+  if (navigator.share && navigator.canShare) {
+    try {
+      var file = new File([blob], fname, { type: "application/pdf" });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: title })
+          .then(function() { toast("Pedido compartido ✓"); })
+          .catch(function(e) { if (e.name !== "AbortError") _shareTextFallback(doc, fname); });
+        return;
+      }
+    } catch(_) {}
+  }
+  _shareTextFallback(doc, fname);
+}
+
+function _shareTextFallback(doc, fname) {
+  // Si no se puede compartir como archivo, intentar texto; si no, modal
   const text = buildOrderText();
   const title = "Pedido de Insumos CIMA";
-
   if (navigator.share) {
     navigator.share({ title: title, text: text })
       .then(function() { toast("Pedido compartido ✓"); })
-      .catch(function(e) { if (e.name !== "AbortError") toast("No se pudo compartir"); });
+      .catch(function(e) {
+        if (e.name !== "AbortError") _showShareModal(text, title);
+      });
     return;
   }
+  _showShareModal(text, title);
+}
 
-  // Fallback: show modal with WhatsApp + email links
+function _showShareModal(text, title) {
   const enc = encodeURIComponent(text);
-  document.getElementById("shareWaLink").href   = "https://wa.me/?text=" + enc;
+  document.getElementById("shareWaLink").href =
+    "https://wa.me/?text=" + enc;
   document.getElementById("shareMailLink").href =
     "mailto:?subject=" + encodeURIComponent(title) + "&body=" + enc;
   document.getElementById("shareOverlay").classList.add("open");
@@ -1474,7 +1504,7 @@ function exportPDF() {
   try { _doExportPDF(); } catch(e) { toast("Error PDF: " + (e.message || String(e)).slice(0,50)); }
 }
 
-function _doExportPDF() {
+function _buildPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -1700,6 +1730,12 @@ function _doExportPDF() {
   }
 
   var fname = "Pedido_Insumos_" + fecha.replace(/-/g, "") + "_" + (solicitante.split(" ")[0] || "CIMA") + ".pdf";
+  return { doc: doc, fname: fname };
+}
+
+function _doExportPDF() {
+  var result = _buildPDF();
+  var doc = result.doc, fname = result.fname;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1710,8 +1746,6 @@ function _doExportPDF() {
     return;
   }
 
-  // ── iOS: intentar Web Share API (funciona en iOS 15+ con HTTPS) ──
-  // Llamamos share como Promise (sin await) para no romper la cadena de gesto
   const blob = doc.output("blob");
   if (navigator.share && navigator.canShare) {
     try {
@@ -1722,7 +1756,7 @@ function _doExportPDF() {
           .catch(e => { if (e.name !== "AbortError") _iosFallback(doc, fname); });
         return;
       }
-    } catch (_) { /* seguir al fallback */ }
+    } catch (_) {}
   }
   _iosFallback(doc, fname);
 }
