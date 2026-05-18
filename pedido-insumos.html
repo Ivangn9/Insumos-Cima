@@ -390,18 +390,25 @@
       color: var(--blue);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
+      transition: background 0.10s, transform 0.08s;
       user-select: none; line-height: 1;
       padding-bottom: 1px;
     }
     .ctr-btn:hover  { background: rgba(0,122,255,0.10); }
-    .ctr-btn:active { background: rgba(0,122,255,0.20); }
+    .ctr-btn:active { background: rgba(0,122,255,0.22); transform: scale(0.78); }
 
     .ctr-val {
       min-width: 28px; text-align: center;
       font-size: 14px; font-weight: 660;
       color: var(--text-primary);
+      border: none; background: transparent; outline: none;
+      padding: 0 2px; cursor: default;
+      -moz-appearance: textfield;
+      -webkit-appearance: none; appearance: none;
     }
+    .ctr-val::-webkit-inner-spin-button,
+    .ctr-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .ctr-val:focus { background: rgba(0,122,255,0.09); border-radius: 4px; cursor: text; }
     .ctr-val.nonzero { color: var(--blue); }
 
     /* ─── Empty state ──────────────────────────────── */
@@ -662,7 +669,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.17</span>
+  <span id="versionLabel">V1.0.18</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -799,7 +806,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.17";
+const CURRENT_VERSION = "1.0.18";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1193,7 +1200,12 @@ function mkCtr(id, type, label) {
       <span class="ctr-lbl">${label}</span>
       <div class="ctr">
         <button class="ctr-btn" onclick="dec('${id}','${type}')" ontouchstart="">−</button>
-        <span class="ctr-val${v ? " nonzero" : ""}" id="v-${id}-${type}">${v}</span>
+        <input type="number" inputmode="numeric" pattern="[0-9]*"
+               class="ctr-val${v ? " nonzero" : ""}" id="v-${id}-${type}"
+               value="${v}" min="0" max="999"
+               onfocus="this.select()"
+               onblur="setQty('${id}','${type}',this.value)"
+               onkeydown="if(event.key==='Enter')this.blur()" />
         <button class="ctr-btn" onclick="inc('${id}','${type}')" ontouchstart="">+</button>
       </div>
     </div>`;
@@ -1201,20 +1213,34 @@ function mkCtr(id, type, label) {
 
 // ─── Counter ops ────────────────────────────────────────────────────────────
 function inc(id, type) {
+  if (navigator.vibrate) navigator.vibrate(8);
   qty[id][type]++;
   refreshVal(id, type);
   refreshRow(id);
   refreshStats();
 }
 function dec(id, type) {
-  if (qty[id][type] > 0) { qty[id][type]--; refreshVal(id, type); refreshRow(id); refreshStats(); }
+  if (qty[id][type] > 0) {
+    if (navigator.vibrate) navigator.vibrate(8);
+    qty[id][type]--;
+    refreshVal(id, type);
+    refreshRow(id);
+    refreshStats();
+  }
+}
+function setQty(id, type, val) {
+  const v = Math.max(0, Math.min(999, parseInt(val) || 0));
+  qty[id][type] = v;
+  refreshVal(id, type);
+  refreshRow(id);
+  refreshStats();
 }
 
 function refreshVal(id, type) {
   const el = document.getElementById(`v-${id}-${type}`);
   if (!el) return;
   const v = qty[id][type];
-  el.textContent = v;
+  el.value = v;
   el.className = "ctr-val" + (v ? " nonzero" : "");
 }
 function refreshRow(id) {

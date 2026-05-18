@@ -1,5 +1,5 @@
 {
-  "version": "1.0.17",
+  "version": "1.0.18",
   "date": "2026-05-15",
-  "changelog": "Compartir envia el PDF como archivo (no texto); usa Web Share API con file attachment"
+  "changelog": "Feedback tactil en botones +/-; ingresar cantidades con teclado tocando el numero"
 }
