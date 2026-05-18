@@ -1,5 +1,5 @@
 {
-  "version": "1.0.18",
-  "date": "2026-05-15",
-  "changelog": "Feedback tactil en botones +/-; ingresar cantidades con teclado tocando el numero"
+  "version": "1.0.19",
+  "date": "2026-05-18",
+  "changelog": "PDF: logo en cabecera, marca de agua semi-transparente, seccion observaciones destacada"
 }
