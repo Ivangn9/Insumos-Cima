@@ -390,18 +390,25 @@
       color: var(--blue);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
+      transition: background 0.10s, transform 0.08s;
       user-select: none; line-height: 1;
       padding-bottom: 1px;
     }
     .ctr-btn:hover  { background: rgba(0,122,255,0.10); }
-    .ctr-btn:active { background: rgba(0,122,255,0.20); }
+    .ctr-btn:active { background: rgba(0,122,255,0.22); transform: scale(0.78); }
 
     .ctr-val {
-      min-width: 28px; text-align: center;
+      width: 28px; min-width: 28px; text-align: center;
       font-size: 14px; font-weight: 660;
       color: var(--text-primary);
+      border: none; background: transparent; outline: none;
+      padding: 0 2px; cursor: default;
+      -moz-appearance: textfield;
+      -webkit-appearance: none; appearance: none;
     }
+    .ctr-val::-webkit-inner-spin-button,
+    .ctr-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .ctr-val:focus { background: rgba(0,122,255,0.09); border-radius: 4px; cursor: text; }
     .ctr-val.nonzero { color: var(--blue); }
 
     /* ─── Empty state ──────────────────────────────── */
@@ -587,7 +594,7 @@
       .form-group.full { grid-column: 1; }
       .col-heads { display: none; }
       .supply-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .counters { width: 100%; justify-content: flex-end; }
+      .counters { width: 100%; justify-content: space-between; }
       .ctr-btn { width: 34px; height: 34px; }
       .stat-pill { min-width: calc(50% - 6px); }
     }
@@ -662,7 +669,7 @@
   <span class="topbar-name">CIMA</span>
   <span class="topbar-sep">·</span>
   <span class="version-dot" id="versionDot"></span>
-  <span id="versionLabel">V1.0.17</span>
+  <span id="versionLabel">V1.0.18</span>
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
@@ -799,10 +806,11 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.17";
+const CURRENT_VERSION = "1.0.20";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
+let _pdfLogoDims = null;
 (function() {
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -812,6 +820,7 @@ let _pdfLogoB64 = null;
       c.width = img.naturalWidth || 300; c.height = img.naturalHeight || 150;
       c.getContext("2d").drawImage(img, 0, 0);
       _pdfLogoB64 = c.toDataURL("image/png");
+      _pdfLogoDims = { w: img.naturalWidth || 300, h: img.naturalHeight || 150 };
     } catch(e) {}
   };
   img.src = "logo.png";
@@ -1193,7 +1202,12 @@ function mkCtr(id, type, label) {
       <span class="ctr-lbl">${label}</span>
       <div class="ctr">
         <button class="ctr-btn" onclick="dec('${id}','${type}')" ontouchstart="">−</button>
-        <span class="ctr-val${v ? " nonzero" : ""}" id="v-${id}-${type}">${v}</span>
+        <input type="number" inputmode="numeric" pattern="[0-9]*"
+               class="ctr-val${v ? " nonzero" : ""}" id="v-${id}-${type}"
+               value="${v}" min="0" max="999"
+               onfocus="this.select()"
+               onblur="setQty('${id}','${type}',this.value)"
+               onkeydown="if(event.key==='Enter')this.blur()" />
         <button class="ctr-btn" onclick="inc('${id}','${type}')" ontouchstart="">+</button>
       </div>
     </div>`;
@@ -1201,20 +1215,34 @@ function mkCtr(id, type, label) {
 
 // ─── Counter ops ────────────────────────────────────────────────────────────
 function inc(id, type) {
+  if (navigator.vibrate) navigator.vibrate(8);
   qty[id][type]++;
   refreshVal(id, type);
   refreshRow(id);
   refreshStats();
 }
 function dec(id, type) {
-  if (qty[id][type] > 0) { qty[id][type]--; refreshVal(id, type); refreshRow(id); refreshStats(); }
+  if (qty[id][type] > 0) {
+    if (navigator.vibrate) navigator.vibrate(8);
+    qty[id][type]--;
+    refreshVal(id, type);
+    refreshRow(id);
+    refreshStats();
+  }
+}
+function setQty(id, type, val) {
+  const v = Math.max(0, Math.min(999, parseInt(val) || 0));
+  qty[id][type] = v;
+  refreshVal(id, type);
+  refreshRow(id);
+  refreshStats();
 }
 
 function refreshVal(id, type) {
   const el = document.getElementById(`v-${id}-${type}`);
   if (!el) return;
   const v = qty[id][type];
-  el.textContent = v;
+  el.value = v;
   el.className = "ctr-val" + (v ? " nonzero" : "");
 }
 function refreshRow(id) {
@@ -1517,11 +1545,30 @@ function _buildPDF() {
 
   const W = 210, M = 14;
 
-  // ── Watermark cross (page 1 background) ──
-  var cx = W / 2, cy = 158, bw = 88, bh = 24;
-  doc.setFillColor(230, 240, 255);
-  doc.roundedRect(cx - bw/2, cy - bh/2, bw, bh, 5, 5, "F");
-  doc.roundedRect(cx - bh/2, cy - bw/2, bh, bw, 5, 5, "F");
+  // ── Watermark (semi-transparent logo or cross fallback) ──
+  (function() {
+    try {
+      if (_pdfLogoB64) {
+        var GS = window.jspdf && window.jspdf.GState;
+        if (GS) {
+          var lW = 100, lH = 50;
+          if (_pdfLogoDims && _pdfLogoDims.w && _pdfLogoDims.h) {
+            var r = _pdfLogoDims.w / _pdfLogoDims.h;
+            lW = 100; lH = Math.round(100 / r);
+          }
+          var lX = (W - lW) / 2, lY = 155 - lH / 2;
+          doc.setGState(new GS({ opacity: 0.07 }));
+          doc.addImage(_pdfLogoB64, "PNG", lX, lY, lW, lH);
+          doc.setGState(new GS({ opacity: 1 }));
+          return;
+        }
+      }
+    } catch(e) {}
+    var cx = W / 2, cy = 158, bw = 88, bh = 24;
+    doc.setFillColor(230, 240, 255);
+    doc.roundedRect(cx - bw/2, cy - bh/2, bw, bh, 5, 5, "F");
+    doc.roundedRect(cx - bh/2, cy - bw/2, bh, bw, 5, 5, "F");
+  })();
 
   // ── Header (dark navy, 0–44mm) ──
   doc.setFillColor(5, 22, 68);
@@ -1537,15 +1584,30 @@ function _buildPDF() {
   doc.roundedRect(177.5, 14.5, 23, 6, 1.5, 1.5, "F");
   doc.roundedRect(186, 7.5, 6, 23, 1.5, 1.5, "F");
 
-  // White CIMA card (left)
+  // White CIMA card (left) — show logo image if loaded, else text fallback
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(M, 8, 46, 28, 4, 4, "F");
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.setTextColor(0, 80, 200);
-  doc.text("CIMA", M + 23, 23, { align: "center" });
-  doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 140, 210);
-  doc.text("Insumos Med.", M + 23, 29, { align: "center" });
+  var _logoInCard = false;
+  if (_pdfLogoB64) {
+    try {
+      var lcW = 38, lcH = 18;
+      if (_pdfLogoDims && _pdfLogoDims.w && _pdfLogoDims.h) {
+        var lcR = _pdfLogoDims.w / _pdfLogoDims.h;
+        if (lcR > 38 / 18) { lcW = 38; lcH = Math.round(38 / lcR); }
+        else { lcH = 18; lcW = Math.round(18 * lcR); }
+      }
+      doc.addImage(_pdfLogoB64, "PNG", M + 23 - lcW / 2, 8 + (28 - lcH) / 2, lcW, lcH);
+      _logoInCard = true;
+    } catch(e) {}
+  }
+  if (!_logoInCard) {
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 80, 200);
+    doc.text("CIMA", M + 23, 23, { align: "center" });
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 140, 210);
+    doc.text("Insumos Med.", M + 23, 29, { align: "center" });
+  }
 
   // Title
   doc.setFontSize(17); doc.setFont("helvetica", "bold");
@@ -1710,22 +1772,42 @@ function _buildPDF() {
       },
     });
 
-    // ── Observations ──
-    var finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 75) + 8;
-    if (observaciones.trim()) {
-      var pH2 = doc.internal.pageSize.height;
-      if (finalY + 22 < pH2 - 16) {
-        doc.setFillColor(237, 244, 255);
-        doc.roundedRect(M, finalY, W - 2*M, 8, 2.5, 2.5, "F");
-        doc.setFillColor(0, 122, 255);
-        doc.roundedRect(M, finalY, 3.5, 8, 1.5, 1.5, "F");
-        doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(80, 120, 195);
-        doc.text("OBSERVACIONES", M + 7, finalY + 5.5);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9); doc.setTextColor(28, 40, 70);
-        var obsLines = doc.splitTextToSize(observaciones, W - 2*M - 9);
-        doc.text(obsLines, M + 7, finalY + 14);
-      }
+    // ── Observations card (always shown) ──
+    var finalY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 75) + 10;
+    var pH2 = doc.internal.pageSize.height;
+    var obsText = observaciones.trim();
+    var obsContentW = W - 2 * M - 14;
+    var obsLines = obsText ? doc.splitTextToSize(obsText, obsContentW) : [];
+    var obsBodyH = obsLines.length > 0 ? (obsLines.length * 5.8 + 4) : 18;
+    var obsBoxH = 16 + obsBodyH;
+    if (finalY + obsBoxH > pH2 - 18) {
+      doc.addPage();
+      finalY = 16;
+      _footer(doc.getNumberOfPages());
+    }
+    // Card fill + border
+    doc.setFillColor(240, 246, 255);
+    doc.roundedRect(M, finalY, W - 2 * M, obsBoxH, 3, 3, "F");
+    doc.setDrawColor(0, 100, 220); doc.setLineWidth(0.4);
+    doc.roundedRect(M, finalY, W - 2 * M, obsBoxH, 3, 3, "S");
+    // Left accent bar
+    doc.setFillColor(0, 122, 255);
+    doc.roundedRect(M, finalY, 4.5, obsBoxH, 2, 2, "F");
+    // Label pill
+    doc.setFillColor(0, 88, 205);
+    doc.roundedRect(M + 9, finalY + 4.5, 52, 7.5, 1.5, 1.5, "F");
+    doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+    doc.text("OBSERVACIONES", M + 35, finalY + 9.5, { align: "center" });
+    // Separator
+    doc.setDrawColor(190, 215, 250); doc.setLineWidth(0.3);
+    doc.line(M + 9, finalY + 14, M + W - 2 * M - 4, finalY + 14);
+    // Content
+    if (obsLines.length > 0) {
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(18, 35, 72);
+      doc.text(obsLines, M + 10, finalY + 21);
+    } else {
+      doc.setFontSize(8.5); doc.setFont("helvetica", "italic"); doc.setTextColor(170, 200, 240);
+      doc.text("Sin observaciones.", M + 10, finalY + 22);
     }
   }
 

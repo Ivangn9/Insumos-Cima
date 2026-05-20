@@ -1,5 +1,5 @@
 {
-  "version": "1.0.17",
-  "date": "2026-05-15",
-  "changelog": "Compartir envia el PDF como archivo (no texto); usa Web Share API con file attachment"
+  "version": "1.0.20",
+  "date": "2026-05-20",
+  "changelog": "Fix Android: boton menos de UND ya no queda cortado en pantallas pequeñas"
 }
