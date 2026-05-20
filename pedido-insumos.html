@@ -398,7 +398,7 @@
     .ctr-btn:active { background: rgba(0,122,255,0.22); transform: scale(0.78); }
 
     .ctr-val {
-      min-width: 28px; text-align: center;
+      width: 28px; min-width: 28px; text-align: center;
       font-size: 14px; font-weight: 660;
       color: var(--text-primary);
       border: none; background: transparent; outline: none;
@@ -594,7 +594,7 @@
       .form-group.full { grid-column: 1; }
       .col-heads { display: none; }
       .supply-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .counters { width: 100%; justify-content: flex-end; }
+      .counters { width: 100%; justify-content: space-between; }
       .ctr-btn { width: 34px; height: 34px; }
       .stat-pill { min-width: calc(50% - 6px); }
     }
@@ -806,7 +806,7 @@
 
 <script>
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.19";
+const CURRENT_VERSION = "1.0.20";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.19",
-  "date": "2026-05-18",
-  "changelog": "PDF: logo en cabecera, marca de agua semi-transparente, seccion observaciones destacada"
+  "version": "1.0.20",
+  "date": "2026-05-20",
+  "changelog": "Fix Android: boton menos de UND ya no queda cortado en pantallas pequeñas"
 }
