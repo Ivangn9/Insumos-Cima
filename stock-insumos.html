@@ -11,14 +11,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --r-xl: 24px; --r-lg: 18px; --r-md: 13px; --r-sm: 10px;
-      --blue:   #007AFF; --blue2: #0055D4;
-      --teal:   #30D158; --red: #FF3B30; --orange: #FF9500;
-      --purple: #BF5AF2; --pink: #FF2D55;
+      --blue: #007AFF; --blue2: #0055D4;
+      --teal: #30D158; --red: #FF3B30; --orange: #FF9500; --purple: #BF5AF2;
       --glass-bg:     rgba(255,255,255,0.22);
-      --glass-bg2:    rgba(255,255,255,0.14);
       --glass-border: rgba(255,255,255,0.42);
       --glass-inner:  inset 0 1px 0 rgba(255,255,255,0.65);
       --shadow-card:  0 8px 32px rgba(31,70,110,0.10), 0 2px 8px rgba(0,0,0,0.05);
@@ -26,11 +23,9 @@
       --blur:         blur(28px) saturate(180%);
       --text-primary:   rgba(10,10,30,0.88);
       --text-secondary: rgba(10,10,30,0.46);
-      --text-tertiary:  rgba(10,10,30,0.30);
+      --text-tertiary:  rgba(10,10,30,0.28);
     }
-
     html { scroll-behavior: smooth; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
       min-height: 100dvh;
@@ -40,680 +35,267 @@
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
-
     body::before {
-      content: "";
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
       background:
         radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,122,255,0.10) 0%, transparent 60%),
         radial-gradient(ellipse 60% 45% at 85% 85%, rgba(48,209,88,0.07) 0%, transparent 60%),
         radial-gradient(ellipse 80% 60% at 50% 55%, rgba(255,255,255,0.28) 0%, transparent 70%),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M30 5v50M5 30h50' stroke='rgba(0,100,200,0.03)' stroke-width='1'/%3E%3C/svg%3E");
     }
-
     body::after {
-      content: "";
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect x='9' y='2' width='6' height='20' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3Crect x='2' y='9' width='20' height='6' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3C/svg%3E");
-      background-size: 120px 120px;
-      background-position: 20px 20px;
-      opacity: 0.7;
+      background-size: 120px 120px; background-position: 20px 20px; opacity: 0.7;
     }
 
-    /* ─── Top bar ─────────────────────────────────────── */
+    /* ─── Topbar ──────────────────────────────────────── */
     .topbar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; align-items: center; gap: 12px;
-      padding: 10px 18px env(safe-area-inset-top, 0);
-      padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+      display: flex; align-items: center; justify-content: center;
+      padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
       background: rgba(204,232,245,0.82);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid rgba(255,255,255,0.50);
       box-shadow: 0 2px 16px rgba(31,70,110,0.08);
     }
-
-    .topbar-brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-
-    .topbar-logo {
-      width: 40px; height: 40px; border-radius: 12px;
-      background: white;
-      box-shadow: 0 2px 10px rgba(0,122,255,0.18);
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden; padding: 5px; flex-shrink: 0;
-    }
-    .topbar-logo img { width: 100%; height: 100%; object-fit: contain; }
-
-    .topbar-text h1 {
-      font-size: 17px; font-weight: 720; letter-spacing: -0.4px;
-      color: var(--text-primary); line-height: 1.1;
-    }
-    .topbar-text p { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
-
-    /* ─── Tab navigation ─────────────────────────────── */
     .tab-nav {
-      display: flex; gap: 4px;
-      padding: 4px;
-      background: rgba(255,255,255,0.28);
-      border: 1px solid rgba(255,255,255,0.48);
-      border-radius: 14px;
-      flex-shrink: 0;
+      display: flex; gap: 4px; padding: 4px;
+      background: rgba(255,255,255,0.28); border: 1px solid rgba(255,255,255,0.48); border-radius: 14px;
     }
-
     .tab-btn {
       display: flex; align-items: center; gap: 5px;
-      padding: 7px 13px;
-      border: none; border-radius: 10px;
-      font-size: 13px; font-weight: 600;
-      color: var(--text-secondary);
-      background: transparent;
-      cursor: pointer;
+      padding: 7px 14px; border: none; border-radius: 10px;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      background: transparent; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-      white-space: nowrap;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s; white-space: nowrap;
     }
     .tab-btn .ti { font-size: 15px; }
-    .tab-btn.active {
-      background: white;
-      color: var(--blue);
-      box-shadow: 0 2px 8px rgba(0,122,255,0.18);
-    }
+    .tab-btn.active { background: white; color: var(--blue); box-shadow: 0 2px 8px rgba(0,122,255,0.18); }
     .tab-btn:active { transform: scale(0.97); }
 
-    /* ─── Page layout ─────────────────────────────────── */
+    /* ─── Page ────────────────────────────────────────── */
     .page {
-      position: relative; z-index: 1;
-      max-width: 920px;
-      margin: 0 auto;
+      position: relative; z-index: 1; max-width: 920px; margin: 0 auto;
       padding: 16px 16px env(safe-area-inset-bottom, 20px);
-      padding-top: calc(72px + 16px);
+      padding-top: calc(52px + env(safe-area-inset-top, 0px) + 16px);
     }
+
+    /* ─── Header card (logo grande) ──────────────────── */
+    .header-card {
+      display: flex; align-items: center; gap: 20px;
+      padding: 20px 26px; border-radius: var(--r-xl); margin-bottom: 14px;
+    }
+    .header-logo-wrap {
+      flex-shrink: 0; background: white; border-radius: 18px;
+      box-shadow: 0 4px 20px rgba(0,122,255,0.18), inset 0 1px 0 rgba(255,255,255,0.5);
+      padding: 10px 18px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-logo { height: 54px; width: auto; object-fit: contain; display: block; }
+    .header-text h1 { font-size: 22px; font-weight: 760; letter-spacing: -0.7px; color: var(--text-primary); line-height: 1.1; }
+    .header-text p  { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-top: 3px; }
+
+    /* ─── Center selector ────────────────────────────── */
+    .center-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .center-btn {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 20px; border-radius: var(--r-xl);
+      border: 2px solid rgba(255,255,255,0.44);
+      background: rgba(255,255,255,0.22);
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      box-shadow: var(--shadow-card), var(--glass-inner);
+      cursor: pointer; text-align: left;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+    .center-btn:active { transform: scale(0.98); }
+    .center-btn.active { border-color: var(--blue); background: rgba(0,122,255,0.09); box-shadow: 0 6px 24px rgba(0,122,255,0.22), var(--glass-inner); }
+    .center-icon { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; background: rgba(255,255,255,0.55); box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: background 0.2s; }
+    .center-btn.active .center-icon { background: rgba(0,122,255,0.14); }
+    .center-info { flex: 1; min-width: 0; }
+    .center-name { font-size: 20px; font-weight: 780; letter-spacing: -0.6px; color: var(--text-primary); line-height: 1; transition: color 0.2s; }
+    .center-btn.active .center-name { color: var(--blue); }
+    .center-sub  { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-top: 2px; }
+    .center-stats { display: flex; gap: 7px; margin-top: 7px; flex-wrap: wrap; }
+    .center-stat-pill { font-size: 11px; font-weight: 650; padding: 2px 9px; border-radius: 20px; }
+    .csp-ok    { background: rgba(48,209,88,0.14);  color: #1a8f3c; }
+    .csp-warn  { background: rgba(255,149,0,0.14);  color: #b86800; }
+    .center-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.14); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; color: transparent; transition: all 0.2s; }
+    .center-btn.active .center-check { background: var(--blue); border-color: var(--blue); color: white; }
 
     /* ─── Glass ───────────────────────────────────────── */
-    .glass {
-      background: var(--glass-bg);
-      backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur);
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--shadow-card), var(--glass-inner);
-    }
+    .glass { background: var(--glass-bg); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 1px solid var(--glass-border); box-shadow: var(--shadow-card), var(--glass-inner); }
 
-    /* ─── Section label ──────────────────────────────── */
-    .section-label {
-      font-size: 11px; font-weight: 680;
-      text-transform: uppercase; letter-spacing: 0.7px;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-    }
-
-    /* ─── Tab content ────────────────────────────────── */
+    /* ─── Tab panes ──────────────────────────────────── */
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
 
-    /* ─── Header card ────────────────────────────────── */
-    .page-header {
-      padding: 18px 22px;
-      border-radius: var(--r-xl);
-      margin-bottom: 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; flex-wrap: wrap;
-    }
-    .page-header h2 { font-size: 19px; font-weight: 750; letter-spacing: -0.5px; }
-    .page-header p  { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-
     /* ─── Summary strip ──────────────────────────────── */
-    .summary-strip {
-      display: flex; gap: 10px;
-      padding: 14px 16px;
-      border-radius: var(--r-lg);
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .stat-card {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 16px;
-      background: rgba(255,255,255,0.35);
-      border: 1px solid rgba(255,255,255,0.52);
-      border-radius: 16px;
-      flex: 1; min-width: 130px;
-    }
-
-    .stat-icon {
-      width: 38px; height: 38px; border-radius: 11px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; flex-shrink: 0;
-    }
+    .summary-strip { display: flex; gap: 10px; padding: 14px 16px; border-radius: var(--r-lg); margin-bottom: 16px; flex-wrap: wrap; }
+    .stat-card { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(255,255,255,0.35); border: 1px solid rgba(255,255,255,0.52); border-radius: 16px; flex: 1; min-width: 120px; }
+    .stat-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
     .stat-icon.blue   { background: rgba(0,122,255,0.14); }
     .stat-icon.green  { background: rgba(48,209,88,0.14); }
     .stat-icon.orange { background: rgba(255,149,0,0.14); }
     .stat-icon.red    { background: rgba(255,59,48,0.14); }
     .stat-icon.purple { background: rgba(191,90,242,0.14); }
-
-    .stat-info .stat-num {
-      font-size: 22px; font-weight: 750; letter-spacing: -0.8px;
-      line-height: 1;
-    }
-    .stat-info .stat-lbl {
-      font-size: 11px; font-weight: 580; color: var(--text-secondary);
-      margin-top: 2px;
-    }
+    .stat-info .stat-num { font-size: 22px; font-weight: 750; letter-spacing: -0.8px; line-height: 1; }
+    .stat-info .stat-lbl { font-size: 11px; font-weight: 580; color: var(--text-secondary); margin-top: 2px; }
 
     /* ─── Buttons ─────────────────────────────────────── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 10px 17px;
-      border-radius: 12px; border: none;
-      font-size: 14px; font-weight: 620;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
-      user-select: none; white-space: nowrap;
-    }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 17px; border-radius: 12px; border: none; font-size: 14px; font-weight: 620; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.15s, box-shadow 0.15s; user-select: none; white-space: nowrap; }
     .btn:active { transform: scale(0.96); }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #007AFF 0%, #0055D4 100%);
-      color: #fff; box-shadow: var(--shadow-btn);
-    }
-    .btn-primary:hover { box-shadow: 0 6px 24px rgba(0,122,255,0.50); }
-
-    .btn-secondary {
-      background: rgba(255,255,255,0.55);
-      border: 1px solid rgba(255,255,255,0.70);
-      color: var(--text-primary);
-    }
-
-    .btn-green {
-      background: rgba(48,209,88,0.14);
-      border: 1px solid rgba(48,209,88,0.30);
-      color: #1a8f3c;
-    }
-    .btn-red {
-      background: rgba(255,59,48,0.10);
-      border: 1px solid rgba(255,59,48,0.18);
-      color: var(--red);
-    }
-    .btn-orange {
-      background: rgba(255,149,0,0.12);
-      border: 1px solid rgba(255,149,0,0.24);
-      color: #b86800;
-    }
+    .btn-primary  { background: linear-gradient(135deg,#007AFF 0%,#0055D4 100%); color:#fff; box-shadow: var(--shadow-btn); }
+    .btn-secondary{ background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.70); color: var(--text-primary); }
+    .btn-green    { background: rgba(48,209,88,0.14); border: 1px solid rgba(48,209,88,0.30); color: #1a8f3c; }
+    .btn-red      { background: rgba(255,59,48,0.10); border: 1px solid rgba(255,59,48,0.18); color: var(--red); }
     .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 9px; }
     .btn-icon { font-size: 16px; line-height: 1; }
 
-    /* ─── Search bar ─────────────────────────────────── */
-    .search-wrap {
-      position: relative; margin-bottom: 14px;
-    }
-    .search-icon {
-      position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
-      font-size: 15px; pointer-events: none;
-    }
-    .search-input {
-      width: 100%;
-      padding: 11px 14px 11px 38px;
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255,255,255,0.62);
-      border-radius: var(--r-md);
-      font-size: 14px; font-family: inherit; color: var(--text-primary);
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-      -webkit-appearance: none;
-    }
-    .search-input:focus {
-      border-color: rgba(0,122,255,0.40);
-      box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
-      background: rgba(255,255,255,0.70);
-    }
+    /* ─── Search ─────────────────────────────────────── */
+    .search-wrap { position: relative; margin-bottom: 14px; }
+    .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+    .search-input { width: 100%; padding: 11px 14px 11px 38px; background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.62); border-radius: var(--r-md); font-size: 14px; font-family: inherit; color: var(--text-primary); outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; }
+    .search-input:focus { border-color: rgba(0,122,255,0.40); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); background: rgba(255,255,255,0.70); }
 
-    /* ─── Category filter pills ──────────────────────── */
-    .cat-filters {
-      display: flex; gap: 7px; margin-bottom: 14px;
-      overflow-x: auto; padding-bottom: 4px;
-      scrollbar-width: none;
-    }
+    /* ─── Cat filter pills ───────────────────────────── */
+    .cat-filters { display: flex; gap: 7px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .cat-filters::-webkit-scrollbar { display: none; }
-
-    .cat-pill {
-      display: flex; align-items: center; gap: 5px;
-      padding: 6px 13px;
-      border-radius: 20px; border: 1px solid rgba(255,255,255,0.52);
-      background: rgba(255,255,255,0.32);
-      font-size: 12px; font-weight: 600; color: var(--text-secondary);
-      cursor: pointer; white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.2s, color 0.2s, border-color 0.2s;
-    }
-    .cat-pill.active {
-      background: var(--blue);
-      color: white;
-      border-color: var(--blue);
-    }
+    .cat-pill { display: flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.52); background: rgba(255,255,255,0.32); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: background 0.2s, color 0.2s; }
+    .cat-pill.active { background: var(--blue); color: white; border-color: var(--blue); }
 
     /* ─── Stock table ─────────────────────────────────── */
-    .stock-table {
-      border-radius: var(--r-xl);
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    .cat-header-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 18px;
-      background: rgba(255,255,255,0.30);
-      border-bottom: 1px solid rgba(255,255,255,0.38);
-    }
-    .cat-icon-badge {
-      width: 30px; height: 30px; border-radius: 9px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; flex-shrink: 0;
-    }
-    .cat-header-row .cat-name {
-      font-size: 13px; font-weight: 700; letter-spacing: -0.2px;
-    }
-    .cat-count {
-      margin-left: auto;
-      font-size: 11px; font-weight: 600; color: var(--text-secondary);
-      background: rgba(0,0,0,0.06);
-      padding: 2px 8px; border-radius: 20px;
-    }
-
-    .stock-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.25);
-      transition: background 0.15s;
-    }
+    .stock-table { border-radius: var(--r-xl); overflow: hidden; margin-bottom: 14px; }
+    .cat-header-row { display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: rgba(255,255,255,0.30); border-bottom: 1px solid rgba(255,255,255,0.38); }
+    .cat-icon-badge { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .cat-header-row .cat-name { font-size: 13px; font-weight: 700; }
+    .cat-count { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: rgba(0,0,0,0.06); padding: 2px 8px; border-radius: 20px; }
+    .stock-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.25); transition: background 0.15s; }
     .stock-row:last-child { border-bottom: none; }
     .stock-row:hover { background: rgba(255,255,255,0.18); }
-
     .stock-info { flex: 1; min-width: 0; }
-    .stock-name {
-      font-size: 14px; font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .stock-meta {
-      display: flex; align-items: center; gap: 8px; margin-top: 2px;
-    }
+    .stock-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stock-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
     .stock-code { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
-    .stock-price-tag {
-      font-size: 11px; font-weight: 600; color: #1a8f3c;
-      background: rgba(48,209,88,0.12);
-      padding: 1px 7px; border-radius: 20px;
-    }
-
-    .stock-controls {
-      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-    }
-
-    .stock-level-badge {
-      min-width: 54px; height: 28px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 8px;
-      font-size: 15px; font-weight: 750;
-      padding: 0 10px;
-    }
-    .slb-ok     { background: rgba(48,209,88,0.14);  color: #1a8f3c; }
-    .slb-warn   { background: rgba(255,149,0,0.14);  color: #b86800; }
-    .slb-low    { background: rgba(255,59,48,0.14);   color: #c0271f; }
-    .slb-empty  { background: rgba(0,0,0,0.07);       color: var(--text-secondary); }
-
-    .stock-unit-label {
-      font-size: 10px; font-weight: 600; color: var(--text-tertiary);
-      text-transform: uppercase; letter-spacing: 0.4px;
-      min-width: 30px;
-    }
-
-    .qty-btn {
-      width: 30px; height: 30px; border-radius: 8px; border: none;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 500; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.15s, transform 0.1s;
-      flex-shrink: 0;
-    }
+    .stock-price-tag { font-size: 11px; font-weight: 600; color: #1a8f3c; background: rgba(48,209,88,0.12); padding: 1px 7px; border-radius: 20px; }
+    .stock-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .stock-level-badge { min-width: 54px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 15px; font-weight: 750; padding: 0 10px; }
+    .slb-ok    { background: rgba(48,209,88,0.14); color: #1a8f3c; }
+    .slb-warn  { background: rgba(255,149,0,0.14); color: #b86800; }
+    .slb-low   { background: rgba(255,59,48,0.14);  color: #c0271f; }
+    .slb-empty { background: rgba(0,0,0,0.07);      color: var(--text-secondary); }
+    .stock-unit-label { font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.4px; min-width: 28px; }
+    .stock-bar-wrap { width: 54px; height: 5px; border-radius: 3px; background: rgba(0,0,0,0.08); overflow: hidden; }
+    .stock-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 500; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s, transform 0.1s; flex-shrink: 0; }
     .qty-btn:active { transform: scale(0.88); }
-    .qty-btn.minus {
-      background: rgba(255,59,48,0.10);
-      color: var(--red);
-      border: 1px solid rgba(255,59,48,0.20);
-    }
-    .qty-btn.plus {
-      background: rgba(48,209,88,0.12);
-      color: #1a8f3c;
-      border: 1px solid rgba(48,209,88,0.24);
-    }
+    .qty-btn.minus { background: rgba(255,59,48,0.10); color: var(--red); border: 1px solid rgba(255,59,48,0.20); }
+    .qty-btn.plus  { background: rgba(48,209,88,0.12); color: #1a8f3c; border: 1px solid rgba(48,209,88,0.24); }
 
     /* ─── Movement log ───────────────────────────────── */
-    .mov-toolbar {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 14px; flex-wrap: wrap;
-    }
-    .mov-toolbar .btn { flex-shrink: 0; }
-
-    .date-filter-group {
-      display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;
-    }
-    .date-filter-group label {
-      font-size: 12px; font-weight: 580; color: var(--text-secondary); white-space: nowrap;
-    }
-    .date-filter-group input[type="date"],
-    .date-filter-group select {
-      padding: 8px 10px;
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255,255,255,0.62);
-      border-radius: var(--r-sm);
-      font-size: 13px; font-family: inherit; color: var(--text-primary);
-      outline: none; -webkit-appearance: none;
-      flex: 1;
-      transition: border-color 0.2s;
-    }
-    .date-filter-group input[type="date"]:focus,
-    .date-filter-group select:focus {
-      border-color: rgba(0,122,255,0.40);
-      box-shadow: 0 0 0 3px rgba(0,122,255,0.10);
-    }
-
+    .mov-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .date-filter-group { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 170px; }
+    .date-filter-group label { font-size: 12px; font-weight: 580; color: var(--text-secondary); white-space: nowrap; }
+    .date-filter-group input[type="date"], .date-filter-group select { padding: 8px 10px; background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.62); border-radius: var(--r-sm); font-size: 13px; font-family: inherit; color: var(--text-primary); outline: none; -webkit-appearance: none; flex: 1; }
     .mov-list { display: flex; flex-direction: column; gap: 8px; }
-
-    .mov-card {
-      display: flex; align-items: center; gap: 12px;
-      padding: 13px 18px;
-      border-radius: var(--r-lg);
-      transition: transform 0.12s;
-    }
-    .mov-card:active { transform: scale(0.99); }
-
-    .mov-type-icon {
-      width: 38px; height: 38px; border-radius: 11px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; flex-shrink: 0;
-    }
+    .mov-card { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: var(--r-lg); }
+    .mov-type-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
     .mov-type-icon.entrada { background: rgba(48,209,88,0.14); }
     .mov-type-icon.salida  { background: rgba(255,59,48,0.12); }
-
     .mov-info { flex: 1; min-width: 0; }
-    .mov-supply-name {
-      font-size: 14px; font-weight: 620;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .mov-details {
-      display: flex; align-items: center; gap: 8px; margin-top: 3px;
-      flex-wrap: wrap;
-    }
+    .mov-supply-name { font-size: 14px; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mov-details { display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
     .mov-date { font-size: 11px; color: var(--text-secondary); }
     .mov-note { font-size: 11px; color: var(--text-secondary); font-style: italic; }
-
-    .mov-qty-badge {
-      font-size: 15px; font-weight: 750;
-      padding: 4px 12px; border-radius: 20px;
-      flex-shrink: 0;
-    }
+    .mov-qty-badge { font-size: 15px; font-weight: 750; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; }
     .mov-qty-badge.entrada { background: rgba(48,209,88,0.14); color: #1a8f3c; }
     .mov-qty-badge.salida  { background: rgba(255,59,48,0.12); color: #c0271f; }
 
     /* ─── Charts ─────────────────────────────────────── */
-    .chart-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-bottom: 16px;
-    }
-
-    .chart-card {
-      padding: 20px;
-      border-radius: var(--r-xl);
-    }
-
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .chart-card { padding: 20px; border-radius: var(--r-xl); }
     .chart-card.full { grid-column: 1 / -1; }
-
-    .chart-title {
-      font-size: 14px; font-weight: 700; margin-bottom: 4px;
-    }
-    .chart-subtitle {
-      font-size: 11px; color: var(--text-secondary); margin-bottom: 16px;
-    }
-
-    .chart-range-btns {
-      display: flex; gap: 5px; margin-bottom: 14px;
-    }
-    .range-btn {
-      padding: 5px 11px;
-      border-radius: 8px; border: 1px solid rgba(255,255,255,0.52);
-      background: rgba(255,255,255,0.32);
-      font-size: 12px; font-weight: 600; color: var(--text-secondary);
-      cursor: pointer; transition: all 0.18s;
-    }
+    .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .chart-subtitle { font-size: 11px; color: var(--text-secondary); margin-bottom: 16px; }
+    .chart-range-btns { display: flex; gap: 5px; margin-bottom: 14px; }
+    .range-btn { padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.52); background: rgba(255,255,255,0.32); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.18s; }
     .range-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
 
-    .chart-canvas-wrap { position: relative; }
-
-    /* ─── Gestión tab ────────────────────────────────── */
-    .gestion-toolbar {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 14px; flex-wrap: wrap;
-    }
-    .gestion-toolbar .search-wrap { flex: 1; margin-bottom: 0; min-width: 200px; }
-
-    .gestion-table {
-      border-radius: var(--r-xl);
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    .gestion-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 11px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.25);
-      transition: background 0.15s;
-    }
+    /* ─── Gestión ────────────────────────────────────── */
+    .gestion-table { border-radius: var(--r-xl); overflow: hidden; margin-bottom: 14px; }
+    .gestion-row { display: flex; align-items: center; gap: 10px; padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.25); transition: background 0.15s; }
     .gestion-row:last-child { border-bottom: none; }
     .gestion-row:hover { background: rgba(255,255,255,0.18); }
-
     .gestion-info { flex: 1; min-width: 0; }
     .gestion-name { font-size: 14px; font-weight: 600; }
     .gestion-sub  { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
-
-    .price-input-wrap {
-      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
-    }
+    .price-input-wrap { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .price-prefix { font-size: 13px; color: var(--text-secondary); }
-    .price-input {
-      width: 90px; padding: 6px 9px;
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255,255,255,0.62);
-      border-radius: 9px;
-      font-size: 14px; font-weight: 600;
-      font-family: inherit; color: var(--text-primary);
-      text-align: right; outline: none;
-      transition: border-color 0.2s;
-    }
+    .price-input { width: 88px; padding: 6px 9px; background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.62); border-radius: 9px; font-size: 14px; font-weight: 600; font-family: inherit; color: var(--text-primary); text-align: right; outline: none; }
     .price-input:focus { border-color: rgba(0,122,255,0.40); }
-
-    .min-stock-input {
-      width: 68px; padding: 6px 9px;
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(255,255,255,0.62);
-      border-radius: 9px;
-      font-size: 14px; font-weight: 600;
-      font-family: inherit; color: var(--text-primary);
-      text-align: center; outline: none;
-      transition: border-color 0.2s;
-    }
-    .min-stock-input:focus { border-color: rgba(0,122,255,0.40); }
-
-    .gestion-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .min-stock-input { width: 60px; padding: 6px 9px; background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.62); border-radius: 9px; font-size: 14px; font-weight: 600; font-family: inherit; color: var(--text-primary); text-align: center; outline: none; }
 
     /* ─── Modals ─────────────────────────────────────── */
-    .modal-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(10,20,40,0.45);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      display: flex; align-items: flex-end; justify-content: center;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s;
-    }
+    .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(10,20,40,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
     .modal-overlay.open { opacity: 1; pointer-events: all; }
-
-    .modal-sheet {
-      width: 100%; max-width: 560px;
-      background: linear-gradient(160deg, #d4ecf7 0%, #dceefa 100%);
-      border-radius: 28px 28px 0 0;
-      padding: 8px 0 env(safe-area-inset-bottom, 24px);
-      transform: translateY(100%);
-      transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-      max-height: 90dvh; overflow-y: auto;
-    }
+    .modal-sheet { width: 100%; max-width: 560px; background: linear-gradient(160deg,#d4ecf7 0%,#dceefa 100%); border-radius: 28px 28px 0 0; padding: 8px 0 env(safe-area-inset-bottom,24px); transform: translateY(100%); transition: transform 0.32s cubic-bezier(0.32,0.72,0,1); max-height: 90dvh; overflow-y: auto; }
     .modal-overlay.open .modal-sheet { transform: translateY(0); }
-
-    .modal-handle {
-      width: 36px; height: 4px; border-radius: 2px;
-      background: rgba(0,0,0,0.15);
-      margin: 10px auto 18px;
-    }
-
-    .modal-title {
-      font-size: 18px; font-weight: 750; letter-spacing: -0.5px;
-      padding: 0 24px; margin-bottom: 20px;
-    }
-
+    .modal-handle { width: 36px; height: 4px; border-radius: 2px; background: rgba(0,0,0,0.15); margin: 10px auto 18px; }
+    .modal-title { font-size: 18px; font-weight: 750; letter-spacing: -0.5px; padding: 0 24px; margin-bottom: 20px; }
     .modal-body { padding: 0 24px; }
-
     .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
     .form-group label { font-size: 12px; font-weight: 580; color: var(--text-secondary); }
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-      padding: 10px 13px;
-      background: rgba(255,255,255,0.50);
-      border: 1px solid rgba(255,255,255,0.65);
-      border-radius: var(--r-md);
-      font-size: 14px; color: var(--text-primary);
-      font-family: inherit; outline: none;
-      -webkit-appearance: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .form-group input:focus,
-    .form-group textarea:focus,
-    .form-group select:focus {
-      border-color: rgba(0,122,255,0.40);
-      box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
-      background: rgba(255,255,255,0.75);
-    }
+    .form-group input, .form-group textarea, .form-group select { padding: 10px 13px; background: rgba(255,255,255,0.50); border: 1px solid rgba(255,255,255,0.65); border-radius: var(--r-md); font-size: 14px; color: var(--text-primary); font-family: inherit; outline: none; -webkit-appearance: none; transition: border-color 0.2s, box-shadow 0.2s; }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: rgba(0,122,255,0.40); box-shadow: 0 0 0 3px rgba(0,122,255,0.12); background: rgba(255,255,255,0.75); }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-    .mov-type-toggle {
-      display: flex; gap: 8px;
-    }
-    .type-toggle-btn {
-      flex: 1; padding: 11px;
-      border-radius: 12px; border: 2px solid transparent;
-      font-size: 14px; font-weight: 650;
-      cursor: pointer; text-align: center;
-      transition: all 0.18s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .type-toggle-btn.entrada {
-      background: rgba(48,209,88,0.10);
-      border-color: rgba(48,209,88,0.20);
-      color: #1a8f3c;
-    }
-    .type-toggle-btn.entrada.selected {
-      background: #30D158;
-      border-color: #30D158;
-      color: white;
-    }
-    .type-toggle-btn.salida {
-      background: rgba(255,59,48,0.10);
-      border-color: rgba(255,59,48,0.18);
-      color: #c0271f;
-    }
-    .type-toggle-btn.salida.selected {
-      background: #FF3B30;
-      border-color: #FF3B30;
-      color: white;
-    }
-
-    .modal-footer {
-      display: flex; gap: 8px;
-      padding: 16px 24px 0;
-    }
+    .mov-type-toggle { display: flex; gap: 8px; }
+    .type-toggle-btn { flex: 1; padding: 11px; border-radius: 12px; border: 2px solid transparent; font-size: 14px; font-weight: 650; cursor: pointer; text-align: center; transition: all 0.18s; -webkit-tap-highlight-color: transparent; }
+    .type-toggle-btn.entrada { background: rgba(48,209,88,0.10); border-color: rgba(48,209,88,0.20); color: #1a8f3c; }
+    .type-toggle-btn.entrada.selected { background: #30D158; border-color: #30D158; color: white; }
+    .type-toggle-btn.salida  { background: rgba(255,59,48,0.10); border-color: rgba(255,59,48,0.18); color: #c0271f; }
+    .type-toggle-btn.salida.selected  { background: #FF3B30; border-color: #FF3B30; color: white; }
+    .modal-footer { display: flex; gap: 8px; padding: 16px 24px 0; }
     .modal-footer .btn { flex: 1; justify-content: center; }
 
-    /* ─── Empty state ─────────────────────────────────── */
-    .empty-state {
-      text-align: center; padding: 48px 24px;
-      color: var(--text-secondary);
-    }
-    .empty-state .es-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 14px; }
-
-    /* ─── Toast ──────────────────────────────────────── */
-    .toast-container {
-      position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
-      left: 50%; transform: translateX(-50%);
-      z-index: 300; display: flex; flex-direction: column; gap: 8px;
-      pointer-events: none; align-items: center;
-    }
-    .toast {
-      display: flex; align-items: center; gap: 8px;
-      padding: 11px 18px;
-      border-radius: 22px;
-      background: rgba(30,40,60,0.88);
-      backdrop-filter: blur(16px);
-      color: white; font-size: 13px; font-weight: 580;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.30);
-      animation: toastIn 0.25s ease, toastOut 0.3s ease 2.4s forwards;
-      white-space: nowrap;
-    }
-    @keyframes toastIn  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
-
-    /* ─── Footer ─────────────────────────────────────── */
-    .footer {
-      text-align: center; padding: 28px 0 8px;
-      font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.2px;
-    }
-
-    /* ─── Stock level bar ─────────────────────────────── */
-    .stock-bar-wrap {
-      width: 60px; height: 5px; border-radius: 3px;
-      background: rgba(0,0,0,0.08); overflow: hidden;
-    }
-    .stock-bar-fill {
-      height: 100%; border-radius: 3px;
-      transition: width 0.3s ease;
-    }
-
-    /* ─── Confirm modal ──────────────────────────────── */
-    .confirm-overlay {
-      position: fixed; inset: 0; z-index: 250;
-      background: rgba(10,20,40,0.50);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      display: flex; align-items: center; justify-content: center;
-      padding: 20px;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.2s;
-    }
+    /* ─── Confirm ────────────────────────────────────── */
+    .confirm-overlay { position: fixed; inset: 0; z-index: 250; background: rgba(10,20,40,0.50); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .confirm-overlay.open { opacity: 1; pointer-events: all; }
-    .confirm-box {
-      background: linear-gradient(160deg, #d4ecf7 0%, #dceefa 100%);
-      border-radius: 22px;
-      padding: 28px 24px 20px;
-      max-width: 340px; width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-      transform: scale(0.90);
-      transition: transform 0.2s;
-    }
+    .confirm-box { background: linear-gradient(160deg,#d4ecf7 0%,#dceefa 100%); border-radius: 22px; padding: 28px 24px 20px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); transform: scale(0.90); transition: transform 0.2s; }
     .confirm-overlay.open .confirm-box { transform: scale(1); }
     .confirm-box h3 { font-size: 17px; font-weight: 750; margin-bottom: 8px; }
     .confirm-box p  { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
     .confirm-box .btn-row { display: flex; gap: 8px; }
     .confirm-box .btn-row .btn { flex: 1; justify-content: center; }
+
+    /* ─── Empty / toast / footer ─────────────────────── */
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
+    .empty-state .es-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+    .toast-container { position: fixed; bottom: calc(env(safe-area-inset-bottom,0px) + 24px); left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; align-items: center; }
+    .toast { display: flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 22px; background: rgba(30,40,60,0.88); backdrop-filter: blur(16px); color: white; font-size: 13px; font-weight: 580; box-shadow: 0 4px 20px rgba(0,0,0,0.30); animation: toastIn 0.25s ease, toastOut 0.3s ease 2.4s forwards; white-space: nowrap; }
+    @keyframes toastIn  { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes toastOut { from{opacity:1}to{opacity:0} }
+    .footer { text-align: center; padding: 28px 0 8px; font-size: 11px; color: var(--text-tertiary); display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .version-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; background: rgba(0,122,255,0.10); border: 1px solid rgba(0,122,255,0.18); color: var(--blue); font-size: 11px; font-weight: 650; letter-spacing: 0.2px; }
+    .btn-refresh { display: inline-flex; align-items: center; gap: 5px; padding: 5px 13px; border-radius: 20px; border: 1px solid rgba(0,122,255,0.28); background: rgba(0,122,255,0.08); color: var(--blue); font-size: 11px; font-weight: 650; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.2s, transform 0.15s; }
+    .btn-refresh:active { transform: scale(0.96); background: rgba(0,122,255,0.16); }
+    .btn-refresh.spin .refresh-icon { animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Update banner ──────────────────────────────── */
+    .update-banner {
+      position: fixed; top: calc(env(safe-area-inset-top, 0px) + 50px); left: 50%; transform: translateX(-50%) translateY(-80px);
+      z-index: 200; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 14px;
+      border-radius: 22px; background: rgba(30,40,60,0.92); backdrop-filter: blur(20px);
+      color: white; font-size: 13px; font-weight: 580; box-shadow: 0 6px 28px rgba(0,0,0,0.28);
+      white-space: nowrap; transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+      opacity: 0; pointer-events: none;
+    }
+    .update-banner.visible { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
+    .update-banner-btn { padding: 5px 13px; border-radius: 14px; background: var(--blue); border: none; color: white; font-size: 12px; font-weight: 680; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
     /* ─── Responsive ─────────────────────────────────── */
     @media (max-width: 600px) {
@@ -722,287 +304,184 @@
       .tab-btn .ti { font-size: 18px; }
       .chart-grid { grid-template-columns: 1fr; }
       .form-row { grid-template-columns: 1fr; }
-      .topbar-text p { display: none; }
       .stock-controls .stock-bar-wrap { display: none; }
-      .date-filter-group label { display: none; }
+      .header-logo { height: 40px; }
+      .center-name { font-size: 17px; }
     }
-    @media (max-width: 360px) {
-      .tab-nav { gap: 2px; }
-      .tab-btn { padding: 6px 8px; }
+    @media (max-width: 380px) {
+      .center-selector { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-<!-- ─── Top bar ──────────────────────────────────────── -->
+<!-- ─── Topbar ───────────────────────────────────────── -->
 <div class="topbar">
-  <div class="topbar-brand">
-    <div class="topbar-logo"><img src="logo.png" alt="CIMA" /></div>
-    <div class="topbar-text">
-      <h1>Stock de Insumos</h1>
-      <p>CIMA · Control de Inventario</p>
-    </div>
-  </div>
   <nav class="tab-nav" role="tablist">
-    <button class="tab-btn active" data-tab="inventario" onclick="switchTab('inventario',this)">
-      <span class="ti">📦</span><span class="label">Inventario</span>
-    </button>
-    <button class="tab-btn" data-tab="movimientos" onclick="switchTab('movimientos',this)">
-      <span class="ti">↕️</span><span class="label">Movimientos</span>
-    </button>
-    <button class="tab-btn" data-tab="graficas" onclick="switchTab('graficas',this)">
-      <span class="ti">📊</span><span class="label">Gráficas</span>
-    </button>
-    <button class="tab-btn" data-tab="gestion" onclick="switchTab('gestion',this)">
-      <span class="ti">⚙️</span><span class="label">Gestión</span>
-    </button>
+    <button class="tab-btn active" onclick="switchTab('inventario',this)"><span class="ti">📦</span><span class="label">Inventario</span></button>
+    <button class="tab-btn"        onclick="switchTab('movimientos',this)"><span class="ti">↕️</span><span class="label">Movimientos</span></button>
+    <button class="tab-btn"        onclick="switchTab('graficas',this)"><span class="ti">📊</span><span class="label">Gráficas</span></button>
+    <button class="tab-btn"        onclick="switchTab('gestion',this)"><span class="ti">⚙️</span><span class="label">Gestión</span></button>
   </nav>
 </div>
 
-<!-- ─── Page ─────────────────────────────────────────── -->
 <div class="page">
 
-  <!-- ════ TAB: INVENTARIO ════════════════════════════ -->
-  <div class="tab-pane active" id="tab-inventario">
-
-    <div class="summary-strip glass">
-      <div class="stat-card">
-        <div class="stat-icon blue">📦</div>
-        <div class="stat-info">
-          <div class="stat-num" id="stat-total">0</div>
-          <div class="stat-lbl">Tipos de insumo</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon green">✅</div>
-        <div class="stat-info">
-          <div class="stat-num" id="stat-ok">0</div>
-          <div class="stat-lbl">Stock OK</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">⚠️</div>
-        <div class="stat-info">
-          <div class="stat-num" id="stat-low">0</div>
-          <div class="stat-lbl">Stock bajo</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon purple">💰</div>
-        <div class="stat-info">
-          <div class="stat-num" id="stat-valor">$0</div>
-          <div class="stat-lbl">Valor en stock</div>
-        </div>
-      </div>
+  <!-- Header con logo grande -->
+  <header class="header-card glass">
+    <div class="header-logo-wrap">
+      <img src="logo.png" alt="CIMA" class="header-logo" />
     </div>
-
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input class="search-input" type="search" id="invSearch"
-             placeholder="Buscar insumo…" oninput="renderInventario()" autocomplete="off" />
+    <div class="header-text">
+      <h1>Stock de Insumos</h1>
+      <p>CIMA · Control de Inventario por Depósito</p>
     </div>
+  </header>
 
-    <div class="cat-filters" id="invCatFilters"></div>
-
-    <div id="invContainer"></div>
-
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:16px"
-            onclick="openMovModal(null,'entrada')">
-      <span class="btn-icon">+</span> Registrar entrada de stock
+  <!-- Selector de centro -->
+  <div class="center-selector">
+    <button class="center-btn active" data-center="GN" onclick="switchCenter('GN')">
+      <div class="center-icon">🏥</div>
+      <div class="center-info">
+        <div class="center-name">GN</div>
+        <div class="center-sub">General Paz</div>
+        <div class="center-stats" id="cs-GN"><span class="center-stat-pill csp-ok">—</span></div>
+      </div>
+      <div class="center-check">✓</div>
+    </button>
+    <button class="center-btn" data-center="Sarmiento" onclick="switchCenter('Sarmiento')">
+      <div class="center-icon">🏨</div>
+      <div class="center-info">
+        <div class="center-name">Sarmiento</div>
+        <div class="center-sub">Centro Sarmiento</div>
+        <div class="center-stats" id="cs-Sarmiento"><span class="center-stat-pill csp-ok">—</span></div>
+      </div>
+      <div class="center-check">✓</div>
     </button>
   </div>
 
-  <!-- ════ TAB: MOVIMIENTOS ════════════════════════════ -->
-  <div class="tab-pane" id="tab-movimientos">
-
-    <div class="mov-toolbar">
-      <button class="btn btn-primary" onclick="openMovModal(null,'entrada')">
-        <span class="btn-icon">📥</span> Entrada
-      </button>
-      <button class="btn btn-red" onclick="openMovModal(null,'salida')">
-        <span class="btn-icon">📤</span> Salida
-      </button>
-      <div class="date-filter-group">
-        <label>Desde</label>
-        <input type="date" id="movDateFrom" onchange="renderMovimientos()" />
-      </div>
-      <div class="date-filter-group">
-        <label>Hasta</label>
-        <input type="date" id="movDateTo" onchange="renderMovimientos()" />
-      </div>
-      <div class="date-filter-group">
-        <select id="movTypeFilter" onchange="renderMovimientos()">
-          <option value="">Todos</option>
-          <option value="entrada">Solo entradas</option>
-          <option value="salida">Solo salidas</option>
-        </select>
-      </div>
+  <!-- ════ INVENTARIO ════ -->
+  <div class="tab-pane active" id="tab-inventario">
+    <div class="summary-strip glass">
+      <div class="stat-card"><div class="stat-icon blue">📦</div><div class="stat-info"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">Tipos de insumo</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-num" id="stat-ok">0</div><div class="stat-lbl">Stock OK</div></div></div>
+      <div class="stat-card"><div class="stat-icon orange">⚠️</div><div class="stat-info"><div class="stat-num" id="stat-low">0</div><div class="stat-lbl">Stock bajo</div></div></div>
+      <div class="stat-card"><div class="stat-icon purple">💰</div><div class="stat-info"><div class="stat-num" id="stat-valor">$0</div><div class="stat-lbl">Valor en stock</div></div></div>
     </div>
-
-    <div class="summary-strip glass" style="margin-bottom:16px">
-      <div class="stat-card">
-        <div class="stat-icon green">📥</div>
-        <div class="stat-info">
-          <div class="stat-num" id="mov-stat-entradas">0</div>
-          <div class="stat-lbl">Entradas (período)</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon red">📤</div>
-        <div class="stat-info">
-          <div class="stat-num" id="mov-stat-salidas">0</div>
-          <div class="stat-lbl">Salidas (período)</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">💸</div>
-        <div class="stat-info">
-          <div class="stat-num" id="mov-stat-gasto">$0</div>
-          <div class="stat-lbl">Gasto período</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="mov-list" id="movContainer"></div>
-
+    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="search" id="invSearch" placeholder="Buscar insumo…" oninput="renderInventario()" autocomplete="off" /></div>
+    <div class="cat-filters" id="invCatFilters"></div>
+    <div id="invContainer"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:16px" onclick="openMovModal(null,'entrada')"><span class="btn-icon">+</span> Registrar entrada de stock</button>
   </div>
 
-  <!-- ════ TAB: GRÁFICAS ═══════════════════════════════ -->
+  <!-- ════ MOVIMIENTOS ════ -->
+  <div class="tab-pane" id="tab-movimientos">
+    <div class="mov-toolbar">
+      <button class="btn btn-primary" onclick="openMovModal(null,'entrada')"><span class="btn-icon">📥</span> Entrada</button>
+      <button class="btn btn-red"     onclick="openMovModal(null,'salida')"><span class="btn-icon">📤</span> Salida</button>
+      <div class="date-filter-group"><label>Desde</label><input type="date" id="movDateFrom" onchange="renderMovimientos()" /></div>
+      <div class="date-filter-group"><label>Hasta</label><input type="date" id="movDateTo"   onchange="renderMovimientos()" /></div>
+      <div class="date-filter-group"><select id="movTypeFilter" onchange="renderMovimientos()"><option value="">Todos</option><option value="entrada">Solo entradas</option><option value="salida">Solo salidas</option></select></div>
+    </div>
+    <div class="summary-strip glass" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-icon green">📥</div><div class="stat-info"><div class="stat-num" id="mov-stat-entradas">0</div><div class="stat-lbl">Entradas (período)</div></div></div>
+      <div class="stat-card"><div class="stat-icon red">📤</div><div class="stat-info"><div class="stat-num" id="mov-stat-salidas">0</div><div class="stat-lbl">Salidas (período)</div></div></div>
+      <div class="stat-card"><div class="stat-icon orange">💸</div><div class="stat-info"><div class="stat-num" id="mov-stat-gasto">$0</div><div class="stat-lbl">Gasto período</div></div></div>
+    </div>
+    <div class="mov-list" id="movContainer"></div>
+  </div>
+
+  <!-- ════ GRÁFICAS ════ -->
   <div class="tab-pane" id="tab-graficas">
-
     <div class="chart-grid">
-
       <div class="chart-card glass full">
         <div class="chart-title">Salidas por día</div>
-        <div class="chart-subtitle">Cantidad total de unidades que salieron del stock</div>
+        <div class="chart-subtitle" id="chart-center-label">Unidades totales salidas del depósito</div>
         <div class="chart-range-btns">
-          <button class="range-btn active" data-range="7" onclick="setChartRange(7,this)">7 días</button>
-          <button class="range-btn" data-range="14" onclick="setChartRange(14,this)">14 días</button>
-          <button class="range-btn" data-range="30" onclick="setChartRange(30,this)">30 días</button>
+          <button class="range-btn active" onclick="setChartRange(7,this)">7 días</button>
+          <button class="range-btn"        onclick="setChartRange(14,this)">14 días</button>
+          <button class="range-btn"        onclick="setChartRange(30,this)">30 días</button>
         </div>
-        <div class="chart-canvas-wrap">
-          <canvas id="chartSalidasDia" height="180"></canvas>
-        </div>
+        <canvas id="chartSalidasDia" height="180"></canvas>
       </div>
-
       <div class="chart-card glass">
         <div class="chart-title">Gasto por categoría</div>
-        <div class="chart-subtitle">Distribución del gasto total en insumos</div>
-        <div class="chart-canvas-wrap">
-          <canvas id="chartGastoCategoria" height="220"></canvas>
-        </div>
+        <div class="chart-subtitle">Distribución del gasto total</div>
+        <canvas id="chartGastoCategoria" height="220"></canvas>
       </div>
-
       <div class="chart-card glass">
         <div class="chart-title">Top insumos por costo</div>
-        <div class="chart-subtitle">Los 10 insumos con mayor gasto acumulado</div>
-        <div class="chart-canvas-wrap">
-          <canvas id="chartTopInsumos" height="220"></canvas>
-        </div>
+        <div class="chart-subtitle">Los 10 con mayor gasto acumulado</div>
+        <canvas id="chartTopInsumos" height="220"></canvas>
       </div>
-
       <div class="chart-card glass full">
         <div class="chart-title">Evolución de stock</div>
-        <div class="chart-subtitle">Historial de nivel de stock de un insumo</div>
+        <div class="chart-subtitle">Historial de nivel de un insumo</div>
         <div style="margin-bottom:12px">
-          <select id="chartSupplySelect" onchange="renderStockChart()"
-                  style="padding:8px 12px;background:rgba(255,255,255,0.50);
-                         border:1px solid rgba(255,255,255,0.65);border-radius:10px;
-                         font-size:13px;font-family:inherit;outline:none;width:100%;max-width:400px">
-          </select>
+          <select id="chartSupplySelect" onchange="renderStockChart()" style="padding:8px 12px;background:rgba(255,255,255,0.50);border:1px solid rgba(255,255,255,0.65);border-radius:10px;font-size:13px;font-family:inherit;outline:none;width:100%;max-width:400px"></select>
         </div>
-        <div class="chart-canvas-wrap">
-          <canvas id="chartStockEvol" height="160"></canvas>
-        </div>
+        <canvas id="chartStockEvol" height="160"></canvas>
       </div>
-
     </div>
-
   </div>
 
-  <!-- ════ TAB: GESTIÓN ════════════════════════════════ -->
+  <!-- ════ GESTIÓN ════ -->
   <div class="tab-pane" id="tab-gestion">
-
-    <div class="gestion-toolbar">
-      <div class="search-wrap">
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="search-wrap" style="flex:1;margin-bottom:0;min-width:200px">
         <span class="search-icon">🔍</span>
-        <input class="search-input" type="search" id="gestionSearch"
-               placeholder="Buscar insumo…" oninput="renderGestion()" autocomplete="off" />
+        <input class="search-input" type="search" id="gestionSearch" placeholder="Buscar insumo…" oninput="renderGestion()" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" onclick="openAddModal()">
-        <span class="btn-icon">+</span> Nuevo insumo
-      </button>
+      <button class="btn btn-primary" onclick="openAddModal()"><span class="btn-icon">+</span> Nuevo insumo</button>
     </div>
-
     <div id="gestionContainer"></div>
-
   </div>
 
-  <div class="footer">CIMA · Stock de Insumos · 2026</div>
+  <div class="footer">
+    <span>CIMA · Stock de Insumos · 2026</span>
+    <span class="version-badge" id="versionBadge">V1.0.0</span>
+    <button class="btn-refresh" id="refreshBtn" onclick="manualRefresh()" title="Verificar actualización">
+      <span class="refresh-icon" id="refreshIcon">↻</span> Actualizar
+    </button>
+  </div>
 </div>
 
-<!-- ─── Modal: Registrar Movimiento ─────────────────── -->
+<!-- ─── Modal Movimiento ─────────────────────────────── -->
 <div class="modal-overlay" id="movModal" onclick="closeMovModal(event)">
   <div class="modal-sheet" onclick="event.stopPropagation()">
     <div class="modal-handle"></div>
     <div class="modal-title" id="movModalTitle">Registrar Movimiento</div>
     <div class="modal-body">
       <div class="form-group">
-        <label>Tipo de movimiento</label>
+        <label>Tipo</label>
         <div class="mov-type-toggle">
-          <button class="type-toggle-btn entrada selected" id="togEntrada" onclick="selectMovType('entrada')">
-            📥 Entrada
-          </button>
-          <button class="type-toggle-btn salida" id="togSalida" onclick="selectMovType('salida')">
-            📤 Salida
-          </button>
+          <button class="type-toggle-btn entrada selected" id="togEntrada" onclick="selectMovType('entrada')">📥 Entrada</button>
+          <button class="type-toggle-btn salida"           id="togSalida"  onclick="selectMovType('salida')">📤 Salida</button>
         </div>
       </div>
-      <div class="form-group">
-        <label>Insumo</label>
-        <select id="movSupplySelect">
-          <option value="">— Seleccionar insumo —</option>
-        </select>
-      </div>
+      <div class="form-group"><label>Insumo</label><select id="movSupplySelect"><option value="">— Seleccionar —</option></select></div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Cantidad</label>
-          <input type="number" id="movQty" min="1" placeholder="0" />
-        </div>
-        <div class="form-group">
-          <label>Fecha</label>
-          <input type="date" id="movDate" />
-        </div>
+        <div class="form-group"><label>Cantidad</label><input type="number" id="movQty" min="1" placeholder="0" /></div>
+        <div class="form-group"><label>Fecha</label><input type="date" id="movDate" /></div>
       </div>
-      <div class="form-group">
-        <label>Nota / Motivo (opcional)</label>
-        <input type="text" id="movNote" placeholder="Ej: Pedido semanal, uso urgente…" />
-      </div>
+      <div class="form-group"><label>Nota (opcional)</label><input type="text" id="movNote" placeholder="Ej: Pedido semanal…" /></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeMovModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveMovimiento()">
-        <span class="btn-icon">✓</span> Guardar
-      </button>
+      <button class="btn btn-primary"   onclick="saveMovimiento()"><span class="btn-icon">✓</span> Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- ─── Modal: Agregar/Editar Insumo ────────────────── -->
+<!-- ─── Modal Agregar Insumo ─────────────────────────── -->
 <div class="modal-overlay" id="addModal" onclick="closeAddModal(event)">
   <div class="modal-sheet" onclick="event.stopPropagation()">
     <div class="modal-handle"></div>
     <div class="modal-title" id="addModalTitle">Nuevo insumo</div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group">
-          <label>Nombre del insumo</label>
-          <input type="text" id="addName" placeholder="Nombre completo…" />
-        </div>
-        <div class="form-group">
-          <label>Código</label>
-          <input type="text" id="addCode" placeholder="DES-001" />
-        </div>
+        <div class="form-group"><label>Nombre</label><input type="text" id="addName" placeholder="Nombre completo…" /></div>
+        <div class="form-group"><label>Código</label><input type="text" id="addCode" placeholder="DES-001" /></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1020,1071 +499,633 @@
         <div class="form-group">
           <label>Unidad</label>
           <select id="addUnit">
-            <option value="UND">Unidad (UND)</option>
-            <option value="CAJA">Caja</option>
-            <option value="PACK">Pack</option>
-            <option value="LT">Litro</option>
-            <option value="KG">Kilogramo</option>
-            <option value="ML">Mililitro</option>
+            <option value="UND">Unidad (UND)</option><option value="CAJA">Caja</option>
+            <option value="PACK">Pack</option><option value="LT">Litro</option><option value="KG">Kilogramo</option>
           </select>
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Precio por unidad ($)</label>
-          <input type="number" id="addPrice" min="0" step="0.01" placeholder="0.00" />
-        </div>
-        <div class="form-group">
-          <label>Stock mínimo alerta</label>
-          <input type="number" id="addMinStock" min="0" placeholder="0" />
-        </div>
+        <div class="form-group"><label>Precio por unidad ($)</label><input type="number" id="addPrice" min="0" step="0.01" placeholder="0.00" /></div>
+        <div class="form-group"><label>Stock mínimo alerta</label><input type="number" id="addMinStock" min="0" placeholder="0" /></div>
       </div>
-      <div class="form-group">
-        <label>Stock inicial</label>
-        <input type="number" id="addInitStock" min="0" placeholder="0" />
-      </div>
+      <div class="form-group"><label>Stock inicial</label><input type="number" id="addInitStock" min="0" placeholder="0" /></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeAddModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveSupply()">
-        <span class="btn-icon">✓</span> Guardar
-      </button>
+      <button class="btn btn-primary"   onclick="saveSupply()"><span class="btn-icon">✓</span> Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- ─── Confirm overlay ──────────────────────────────── -->
+<!-- ─── Confirm ──────────────────────────────────────── -->
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-box">
-    <h3 id="confirmTitle">¿Eliminar insumo?</h3>
-    <p id="confirmMsg">Esta acción no se puede deshacer.</p>
+    <h3 id="confirmTitle">Confirmar</h3><p id="confirmMsg">¿Seguro?</p>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="closeConfirm()">Cancelar</button>
-      <button class="btn btn-red" id="confirmOkBtn">Eliminar</button>
+      <button class="btn btn-red"       id="confirmOkBtn">Aceptar</button>
     </div>
   </div>
 </div>
 
-<!-- ─── Toast ─────────────────────────────────────────── -->
 <div class="toast-container" id="toastContainer"></div>
 
+<!-- ─── Update banner ─────────────────────────────── -->
+<div class="update-banner" id="updateBanner">
+  🆕 Nueva versión disponible
+  <button class="update-banner-btn" onclick="applyUpdate()">Actualizar ahora</button>
+  <button style="background:transparent;border:none;color:rgba(255,255,255,0.55);cursor:pointer;font-size:16px;padding:0 0 0 4px;line-height:1" onclick="dismissUpdateBanner()">×</button>
+</div>
+
 <script>
-// ─── Supply catalog (desde Excel CIMA) ──────────────────────────────────────
+// ─── Version & Auto-Update ────────────────────────────────────────────────────
+const APP_VERSION = "1.0.0";
+
+(function initVersion(){
+  const el = document.getElementById("versionBadge");
+  if(el) el.textContent = "V" + APP_VERSION;
+})();
+
+function checkForUpdates(silent){
+  const btn = document.getElementById("refreshBtn");
+  const icon = document.getElementById("refreshIcon");
+  if(!silent){ btn && btn.classList.add("spin"); icon && (icon.style.display="inline-block"); }
+  fetch(location.pathname + "?_nocache=" + Date.now(), {cache:"no-store"})
+    .then(r => r.text())
+    .then(html => {
+      const m = html.match(/APP_VERSION\s*=\s*"([^"]+)"/);
+      if(m && m[1] !== APP_VERSION){
+        showUpdateBanner(m[1]);
+      } else if(!silent){
+        toast("✓ Ya tenés la versión más reciente (V" + APP_VERSION + ")");
+      }
+    })
+    .catch(()=>{ if(!silent) toast("⚠️ Sin conexión para verificar actualización"); })
+    .finally(()=>{ if(!silent){ btn && btn.classList.remove("spin"); } });
+}
+
+function showUpdateBanner(newVer){
+  const b = document.getElementById("updateBanner");
+  if(b){
+    b.querySelector(".update-banner-btn") && (b.innerHTML = `🆕 Nueva versión V${newVer} disponible <button class="update-banner-btn" onclick="applyUpdate()">Actualizar ahora</button> <button style="background:transparent;border:none;color:rgba(255,255,255,0.55);cursor:pointer;font-size:16px;padding:0 0 0 4px;line-height:1" onclick="dismissUpdateBanner()">×</button>`);
+    b.classList.add("visible");
+  }
+}
+
+function dismissUpdateBanner(){ document.getElementById("updateBanner").classList.remove("visible"); }
+function applyUpdate(){ location.reload(true); }
+function manualRefresh(){ checkForUpdates(false); }
+
+// Verificar actualizaciones cada 5 minutos
+setInterval(()=>checkForUpdates(true), 5 * 60 * 1000);
+
+// ─── Catalog ─────────────────────────────────────────────────────────────────
 const CATALOG = {
-  "Descartables": {
-    icon: "💉", color: "rgba(0,122,255,0.14)",
-    items: [
-      { id:"des001", name:"Abbocath JELCO 14G",                                           code:"DES-001" },
-      { id:"des002", name:"Abbocath JELCO 16G",                                           code:"DES-002" },
-      { id:"des003", name:"Abbocath JELCO 18G",                                           code:"DES-003" },
-      { id:"des004", name:"Abbocath JELCO 20G",                                           code:"DES-004" },
-      { id:"des005", name:"Abbocath JELCO 22G",                                           code:"DES-005" },
-      { id:"des006", name:"Abbocath JELCO 24G",                                           code:"DES-006" },
-      { id:"des007", name:"Jeringas Tomey descartables sin aguja x 60ml",                 code:"DES-007" },
-      { id:"des008", name:"Jeringa/Agujas hip. estériles Tuberculina con aguja x 1ml",    code:"DES-008" },
-      { id:"des009", name:'Agujas hipodérmica estéril 30G - 13/3 (1")',                   code:"DES-009" },
-      { id:"des010", name:"Agujas hipodérmica estéril 25G - 16/5",                        code:"DES-010" },
-      { id:"des011", name:'Agujas hipodérmica estéril 21G - 50/8 (2")',                   code:"DES-011" },
-      { id:"des012", name:'Agujas hipodérmica estéril 21G - 40/8 (1½")',                  code:"DES-012" },
-      { id:"des013", name:'Agujas hipodérmica estéril 21G - 25/8 (1")',                   code:"DES-013" },
-      { id:"des014", name:'Agujas hipodérmica estéril 18G - 40/12 (1½")',                 code:"DES-014" },
-      { id:"des015", name:"Alcohol en gel neutro",                                        code:"DES-015" },
-      { id:"des016", name:"Alcohol líquido x 1 Lt 96%",                                  code:"DES-016" },
-      { id:"des017", name:"Alcohol líquido x Lt (70%)",                                   code:"DES-017" },
-      { id:"des018", name:"Algodón (Pack)",                                               code:"DES-018" },
-      { id:"des019", name:"Apósito Transparente con marco de aplicación",                  code:"DES-019" },
-      { id:"des020", name:"Apósitos estériles (7 x 20cm)",                                code:"DES-020" },
-      { id:"des021", name:"Apósitos hipoalergénicos (x250un)",                            code:"DES-021" },
-      { id:"des022", name:"Apósitos protectores (Curitas) (x10Un)",                       code:"DES-022" },
-      { id:"des023", name:"Barbijos (Pack x50)",                                          code:"DES-023" },
-      { id:"des024", name:"Barbijos NK95",                                                code:"DES-024" },
-      { id:"des025", name:"Batas cortas sin mangas",                                      code:"DES-025" },
-      { id:"des026", name:"Batas largas con puño",                                        code:"DES-026" },
-      { id:"des027", name:"Cubre Camilla",                                                code:"DES-027" },
-      { id:"des028", name:"Bisturi N11",                                                  code:"DES-028" },
-      { id:"des029", name:"Bisturi N15",                                                  code:"DES-029" },
-      { id:"des030", name:"Bisturi N22",                                                  code:"DES-030" },
-      { id:"des031", name:"Butterfly 19",                                                 code:"DES-031" },
-      { id:"des032", name:"Butterfly 21",                                                 code:"DES-032" },
-      { id:"des033", name:"Butterfly 23",                                                 code:"DES-033" },
-      { id:"des034", name:"Butterfly 25",                                                 code:"DES-034" },
-      { id:"des035", name:"Campos quirúrgicos estériles (50x50)",                         code:"DES-035" },
-      { id:"des036", name:"Cánula nasal para adulto (Tipo K-27)",                         code:"DES-036" },
-      { id:"des037", name:"Cinta hipoalergénica Transpore 3M x Rollo",                   code:"DES-037" },
-      { id:"des038", name:"Cinta hipoalergénica Micropore 3M x Rollo (PAPEL)",           code:"DES-038" },
-      { id:"des039", name:"Cotonetes (x200un)",                                           code:"DES-039" },
-      { id:"des040", name:"Envase estéril descartable",                                   code:"DES-040" },
-      { id:"des041", name:"Electrodos cardiacos 3M (x50)",                               code:"DES-041" },
-      { id:"des042", name:"Electrodos para RMI con punta de Carbón (x50)",               code:"DES-042" },
-      { id:"des043", name:"Etiqueta",                                                     code:"DES-043" },
-      { id:"des044", name:"Fundas ecográficas de látex / Preservativos (x144 un)",        code:"DES-044" },
-      { id:"des045", name:"Gasa estéril",                                                 code:"DES-045" },
-      { id:"des046", name:"Gel x 250ml",                                                  code:"DES-046" },
-      { id:"des047", name:"Vaselina sólida x1kg.",                                        code:"DES-047" },
-      { id:"des048", name:"Gel x 3 Lt (5kg)",                                             code:"DES-048" },
-      { id:"des049", name:"Gel x 500ml",                                                  code:"DES-049" },
-      { id:"des050", name:"Goma para ligar",                                              code:"DES-050" },
-      { id:"des051", name:"Guantes estériles (6½) xUn",                                  code:"DES-051" },
-      { id:"des052", name:"Guantes estériles pares (7) xUn",                             code:"DES-052" },
-      { id:"des053", name:"Guantes estériles pares (7½) xUn",                            code:"DES-053" },
-      { id:"des054", name:"Guantes estériles pares (8) xUn",                             code:"DES-054" },
-      { id:"des055", name:"Guantes estériles pares (8½) xUn",                            code:"DES-055" },
-      { id:"des056", name:"Guantes Estériles Polietileno",                                code:"DES-056" },
-      { id:"des057", name:"Guantes Nitrilo",                                              code:"DES-057" },
-      { id:"des058", name:'Guantes latex talle PAR "M" y "S"',                           code:"DES-058" },
-      { id:"des059", name:"Guantes Manoplas de Nylon",                                   code:"DES-059" },
-      { id:"des060", name:"Jeringa dual con Espiga TAC (x20) Stellant",                   code:"DES-060" },
-      { id:"des061", name:"Jeringa dual con espiga y tubo RESO (x50) Spectris",           code:"DES-061" },
-      { id:"des062", name:"Jeringas desechables x 10ml",                                  code:"DES-062" },
-      { id:"des063", name:"Jeringas desechables x 20ml",                                  code:"DES-063" },
-      { id:"des064", name:"Jeringas hipodérmicas estériles x 5ml",                        code:"DES-064" },
-      { id:"des065", name:"Jeringas hipodérmicas estériles x 60ml",                       code:"DES-065" },
-      { id:"des066", name:"Jeringas Pico a rosca 20ml",                                   code:"DES-066" },
-      { id:"des067", name:"Jeringas Pico a rosca 10ml",                                   code:"DES-067" },
-      { id:"des068", name:"Jeringas Pico a rosca 5ml",                                    code:"DES-068" },
-      { id:"des069", name:'Agujas espinales 22G (3½")',                                   code:"DES-069" },
-      { id:"des070", name:"Llaves 3 vias",                                                code:"DES-070" },
-      { id:"des071", name:"Llaves 3 vias C/ extensión 50Cm",                             code:"DES-071" },
-      { id:"des072", name:"Máscaras protectoras Faciales",                                code:"DES-072" },
-      { id:"des073", name:"Media Sábana (0,66 x 1,55mts)",                               code:"DES-073" },
-      { id:"des074", name:"Pañales descartables (XXL)",                                   code:"DES-074" },
-      { id:"des075", name:"Pasta conductora de EEG",                                      code:"DES-075" },
-      { id:"des076", name:"Pasta conductora TEN20",                                       code:"DES-076" },
-      { id:"des077", name:"Prolongador bifurcado (2 Vías) PB-1000",                       code:"DES-077" },
-      { id:"des078", name:"Prolongador/Extensor 50 Cm.",                                  code:"DES-078" },
-      { id:"des079", name:"Protectores auditivos descartables",                           code:"DES-079" },
-      { id:"des080", name:"Rollo de Papel",                                               code:"DES-080" },
-      { id:"des081", name:"Parches Oculares",                                             code:"DES-081" },
-      { id:"des082", name:"Inhalador de oxígeno pediátrico (Tipo K-27) 2m",              code:"DES-082" },
-      { id:"des083", name:"Pilas AA",                                                     code:"DES-083" },
-      { id:"des084", name:"Pilas AAA",                                                    code:"DES-084" },
-      { id:"des085", name:"Sonda Tipo K-33 (Seriografo)",                                code:"DES-085" },
-      { id:"des086", name:"Sonda Nelaton K-92 - N° 8 - (Seriografo)",                   code:"DES-086" },
-      { id:"des087", name:"Sonda Foley N° 10 FR",                                        code:"DES-087" },
-      { id:"des088", name:"Sonda Foley N° 12 FR",                                        code:"DES-088" },
-      { id:"des089", name:"Sonda Foley N° 16 FR",                                        code:"DES-089" },
-      { id:"des090", name:"Sonda Foley N° 20 FR",                                        code:"DES-090" },
-      { id:"des091", name:"Sonda gástrica N° 16 (Tipo K10)",                             code:"DES-091" },
-      { id:"des092", name:"Sonda para alimentación nasogástrica (adultos)",               code:"DES-092" },
-      { id:"des093", name:"Sonda para alimentación nasogástrica (prematuros)",            code:"DES-093" },
-      { id:"des094", name:"Tubo conector de baja presión RESO-TAC (x50)",                code:"DES-094" },
-      { id:"des095", name:"Venda Elástica (10 x 3Mts)",                                  code:"DES-095" },
-      { id:"des096", name:"Sonda K33",                                                   code:"DES-096" },
-      { id:"des097", name:"Sonda K92",                                                   code:"DES-097" },
-      { id:"des098", name:"Sábanas para camillas con elástico",                          code:"DES-098" },
-      { id:"des099", name:"Set de infusión, equipo V14",                                 code:"DES-099" },
-      { id:"des100", name:"Venda Cambric (7 Cm)",                                        code:"DES-100" },
-      { id:"des101", name:"Hilo Monofilament Nylon - 3.0",                               code:"DES-101" },
-      { id:"des102", name:"Hilo Monofilament Nylon - 4.0",                               code:"DES-102" },
-      { id:"des103", name:"Hilo Monofilament Nylon - 5.0",                               code:"DES-103" },
-      { id:"des104", name:"Hilo Monofilament Nylon - 6.0",                               code:"DES-104" },
-      { id:"des105", name:"Hilo Synthetic - 3.0",                                        code:"DES-105" },
-      { id:"des106", name:"Hilo Synthetic - 4.0",                                        code:"DES-106" },
-      { id:"des107", name:"Hilo Synthetic - 5.0",                                        code:"DES-107" },
-      { id:"des108", name:"Caja Acero Inox.",                                            code:"DES-108" },
-      { id:"des109", name:"Material de Esterilización",                                  code:"DES-109" },
-      { id:"des110", name:"Esterilización",                                              code:"DES-110" },
-      { id:"des111", name:"Guía con filtro 0.2 micrones",                                code:"DES-111" },
-    ]
-  },
-  "Punción": {
-    icon: "🔬", color: "rgba(191,90,242,0.10)",
-    items: [
-      { id:"pun001", name:"Catéter de histerosona 5FRx40cm",                            code:"PUN-001" },
-      { id:"pun002", name:"Catéter de histerosona 7FRx40",                              code:"PUN-002" },
-      { id:"pun003", name:"Cateter Trocar Torácico 18FG",                               code:"PUN-003" },
-      { id:"pun004", name:'Agujas espinales 20G (3½")',                                 code:"PUN-004" },
-      { id:"pun005", name:'Agujas espinales 19G (3½")',                                 code:"PUN-005" },
-      { id:"pun006", name:'Agujas espinales 18G (3½")',                                 code:"PUN-006" },
-      { id:"pun007", name:"Aguja Punta Fina (Punción mama) (5.5 x 40cm)",              code:"PUN-007" },
-      { id:"pun008", name:"Aguja Punta Fina (Punción mama) (18GA x 10cm) Argon",       code:"PUN-008" },
-      { id:"pun009", name:"Aguja Punta Fina (Punción mama) (14GA x 10cm)",             code:"PUN-009" },
-      { id:"pun010", name:"Aguja Huber 19/20G",                                        code:"PUN-010" },
-      { id:"pun011", name:"Aguja (Punción) (18GA x 20cm) Biocore II BR",               code:"PUN-011" },
-      { id:"pun012", name:"Aguja (Punción) (16GA x 20cm) Biocore II BR",               code:"PUN-012" },
-      { id:"pun013", name:"Aguja (Punción) (14GA x 20cm) Biocore II BR",               code:"PUN-013" },
-      { id:"pun014", name:"Marcador Mamawire Fix (18Ga x 10) Histo",                   code:"PUN-014" },
-      { id:"pun015", name:"Marcador Mamawire (20Ga x 0,7) Histo",                      code:"PUN-015" },
-      { id:"pun016", name:"Porta Objetos (x50un)",                                     code:"PUN-016" },
-      { id:"pun017", name:"Cepillo Endovaginal",                                       code:"PUN-017" },
-      { id:"pun018", name:"Hisopos Ginecología",                                       code:"PUN-018" },
-    ]
-  },
-  "Ginecología e Instrumental": {
-    icon: "🩺", color: "rgba(255,45,85,0.10)",
-    items: [
-      { id:"gin001", name:"Espátula de madera de AYRE",           code:"GIN-001" },
-      { id:"gin002", name:"Pinzas MAIER",                          code:"GIN-002" },
-      { id:"gin003", name:"Espéculo Vaginal Chico",                code:"GIN-003" },
-      { id:"gin004", name:"Espéculo Vaginal Grande",               code:"GIN-004" },
-      { id:"gin005", name:"Espéculo Vaginal Mediano",              code:"GIN-005" },
-      { id:"gin006", name:"Tijera Quirúrgica",                     code:"GIN-006" },
-      { id:"gin007", name:"Pinza Maier Recta x 25Cm.",            code:"GIN-007" },
-      { id:"gin008", name:"Pinza Halster Bertola x 26Cm",         code:"GIN-008" },
-      { id:"gin009", name:"Pinza Kocher Recta x 24Cm",            code:"GIN-009" },
-      { id:"gin010", name:"Pinza Foester Recta x 25Cm",           code:"GIN-010" },
-      { id:"gin011", name:"Histerómetro Sim",                     code:"GIN-011" },
-      { id:"gin012", name:"Tijera Sims Uterina Recta x 24Cm",    code:"GIN-012" },
-      { id:"gin013", name:"Espéculo Chico",                        code:"GIN-013" },
-      { id:"gin014", name:"Espéculo Mediano",                      code:"GIN-014" },
-      { id:"gin015", name:"Espéculo Grande",                       code:"GIN-015" },
-      { id:"gin016", name:"Caja Porta Materiales",                 code:"GIN-016" },
-      { id:"gin017", name:"Pinza Adson con Dientes",               code:"GIN-017" },
-      { id:"gin018", name:"Pinza Adson SIN Dientes",               code:"GIN-018" },
-      { id:"gin019", name:"Mango N°3 - Porta Bisturí N°15",       code:"GIN-019" },
-      { id:"gin020", name:"Pinza Halstead Mosquito",               code:"GIN-020" },
-      { id:"gin021", name:"Pinza Halstead Mediana",                code:"GIN-021" },
-      { id:"gin022", name:"Tijera de Mayo",                        code:"GIN-022" },
-      { id:"gin023", name:"Tijera Metzenbaum",                     code:"GIN-023" },
-      { id:"gin024", name:"Separadores Farabeuf Chico",           code:"GIN-024" },
-      { id:"gin025", name:"Kit Ginecología",                       code:"GIN-025" },
-    ]
-  },
-  "Contrastes y Otros": {
-    icon: "🩻", color: "rgba(90,200,250,0.12)",
-    items: [
-      { id:"con001", name:"Contrastes EZCAT / TRIYOSOM",                       code:"CON-001" },
-      { id:"con002", name:"Contrastes Gadovist Gadolinio",                     code:"CON-002" },
-      { id:"con003", name:"Contrastes Primovist Bayer",                        code:"CON-003" },
-      { id:"con004", name:"Contrastes ULTRAVIST 300 BAYER 50ml x48",           code:"CON-004" },
-      { id:"con005", name:"Contrastes ULTRAVIST 370 BAYER 50ml x48",           code:"CON-005" },
-      { id:"con006", name:"Contrastes ULTRAVIST 370 x 100ml BAYER x36",        code:"CON-006" },
-      { id:"con007", name:"Contrastes ULTRAVIST 300 x 100ml BAYER x36",        code:"CON-007" },
-      { id:"con008", name:"Accesorio para contraste Colon",                    code:"CON-008" },
-      { id:"con009", name:"Gastropaque F - 500 Ml.",                           code:"CON-009" },
-      { id:"con010", name:"Gastropaque S - 340 Gr. c/ Efervecente",            code:"CON-010" },
-      { id:"con011", name:"Gastropaque S - 300 Gr. s/ Efervecente",            code:"CON-011" },
-      { id:"con012", name:"Xenetic - 350x100",                                 code:"CON-012" },
-      { id:"con013", name:"Xenetrix 350x50",                                   code:"CON-013" },
-      { id:"con014", name:"Xenetrix 300x50",                                   code:"CON-014" },
-    ]
-  },
-  "Medicamentos": {
-    icon: "💊", color: "rgba(48,209,88,0.10)",
-    items: [
-      { id:"med001", name:"Triamcinolona 6 mg/ml",                             code:"MED-001" },
-      { id:"med002", name:"Lidocaína Gel pomo (25ml)",                         code:"MED-002" },
-      { id:"med003", name:"Dipirona 1 Amp. 1 Ml.",                             code:"MED-003" },
-      { id:"med004", name:"Ketorolac 30mg. 2Ml.",                              code:"MED-004" },
-      { id:"med005", name:"Metoclopramida ampolla (2ml)",                      code:"MED-005" },
-      { id:"med006", name:"Ondansetron (8ml)",                                 code:"MED-006" },
-      { id:"med007", name:"Heparina sódica (5ml)",                             code:"MED-007" },
-      { id:"med008", name:"Hidrocortisona crema (15mg)",                       code:"MED-008" },
-      { id:"med009", name:"Hioscina – Buscapina ampolla (1ml)",                code:"MED-009" },
-      { id:"med010", name:"Dexametasona ampolla (2ml)",                        code:"MED-010" },
-      { id:"med011", name:"Propofol 10 Ml. Ampolla",                           code:"MED-011" },
-      { id:"med012", name:"Hidrocortisona ampolla/polvo (100mg)",              code:"MED-012" },
-      { id:"med013", name:"Hidrocortisona ampolla/polvo (500mg)",              code:"MED-013" },
-      { id:"med014", name:"Lidocaína ampolla LAVIMAR (5ml)",                   code:"MED-014" },
-      { id:"med015", name:"Lidocaína Amp. C/Epinefrina",                       code:"MED-015" },
-      { id:"med016", name:"Iodopovidona en Spray (Pervinox)",                  code:"MED-016" },
-      { id:"med017", name:"Iodopovidona x 100 ml.",                            code:"MED-017" },
-      { id:"med018", name:"Iodopovidona x 5Lt",                                code:"MED-018" },
-      { id:"med019", name:"Difenhidramina clorhidrato ampolla (10mg)",         code:"MED-019" },
-      { id:"med020", name:"Atropina Sulfato (1ml)",                            code:"MED-020" },
-      { id:"med021", name:"Ranitidina 50mg",                                   code:"MED-021" },
-      { id:"med022", name:"Diclofenac 75mg",                                   code:"MED-022" },
-      { id:"med023", name:"Sevorane / Sevoflurano",                            code:"MED-023" },
-      { id:"med024", name:"Percloruro Férrico (Solución Monsel) 10 Ml.",       code:"MED-024" },
-      { id:"med025", name:"Solución de ácido acético (500ml)",                 code:"MED-025" },
-      { id:"med026", name:"Solución de Dextrosa 5%",                           code:"MED-026" },
-      { id:"med027", name:"Solución de Lugol (500ml)",                         code:"MED-027" },
-      { id:"med028", name:"Solución de manitol al 15% (500ml)",                code:"MED-028" },
-      { id:"med029", name:"Solución Fisiológica ampolla",                      code:"MED-029" },
-      { id:"med030", name:"Spray Sanitizante de piel con Clorhexidina (x120ml)",code:"MED-030" },
-      { id:"med031", name:"Solución Ringer Lactato",                           code:"MED-031" },
-      { id:"med032", name:"Suero (solución cloruro de sodio) (100ml)",         code:"MED-032" },
-      { id:"med033", name:"Suero (solución cloruro de sodio) (250ml)",         code:"MED-033" },
-      { id:"med034", name:"Corteroid Retard ampolla (2ml)",                    code:"MED-034" },
-      { id:"med035", name:"Adrenalina ampolla (1ml)",                          code:"MED-035" },
-      { id:"med036", name:"Agua destilada 500 Ml.",                            code:"MED-036" },
-      { id:"med037", name:"Agua destilada ampolla",                            code:"MED-037" },
-      { id:"med038", name:"Agua oxigenada x 1 Lt.",                            code:"MED-038" },
-      { id:"med039", name:"Novaxil",                                           code:"MED-039" },
-      { id:"med040", name:"Ácido Tricloroacético 3% 250 Ml.",                  code:"MED-040" },
-      { id:"med041", name:"Suero (solución cloruro de sodio) (500ml)",         code:"MED-041" },
-      { id:"med042", name:"Midazolam 15Mg. - Amp.",                            code:"MED-042" },
-      { id:"med043", name:"Fentanilo",                                         code:"MED-043" },
-      { id:"med044", name:"Mamografía Iny. Carbón Activado",                   code:"MED-044" },
-      { id:"med045", name:"Carbón Activado al 4%",                             code:"MED-045" },
-    ]
-  },
-  "Impresiones y Oficina": {
-    icon: "🖨️", color: "rgba(255,149,0,0.12)",
-    items: [
-      { id:"imp001", name:"Hoja membretada/QR",                                code:"IMP-001" },
-      { id:"imp002", name:"Sobre 19×24 (x250)",                                code:"IMP-002" },
-      { id:"imp003", name:"Sobre 12×35 (x500)",                                code:"IMP-003" },
-      { id:"imp004", name:"Sobres Oficio",                                     code:"IMP-004" },
-      { id:"imp005", name:"Pen Drive",                                         code:"IMP-005" },
-      { id:"imp006", name:"Entrega Digital – Keyra",                           code:"IMP-006" },
-      { id:"imp007", name:"Cajas de resmas (x12)",                             code:"IMP-007" },
-      { id:"imp008", name:"CD 8 Gb.",                                          code:"IMP-008" },
-    ]
-  },
+  "Descartables":{icon:"💉",color:"rgba(0,122,255,0.14)",items:[
+    {id:"des001",name:"Abbocath JELCO 14G",code:"DES-001"},{id:"des002",name:"Abbocath JELCO 16G",code:"DES-002"},
+    {id:"des003",name:"Abbocath JELCO 18G",code:"DES-003"},{id:"des004",name:"Abbocath JELCO 20G",code:"DES-004"},
+    {id:"des005",name:"Abbocath JELCO 22G",code:"DES-005"},{id:"des006",name:"Abbocath JELCO 24G",code:"DES-006"},
+    {id:"des007",name:"Jeringas Tomey descartables sin aguja x 60ml",code:"DES-007"},
+    {id:"des008",name:"Jeringa/Agujas hip. estériles Tuberculina con aguja x 1ml",code:"DES-008"},
+    {id:"des009",name:'Agujas hipodérmica estéril 30G - 13/3 (1")',code:"DES-009"},
+    {id:"des010",name:"Agujas hipodérmica estéril 25G - 16/5",code:"DES-010"},
+    {id:"des011",name:'Agujas hipodérmica estéril 21G - 50/8 (2")',code:"DES-011"},
+    {id:"des012",name:'Agujas hipodérmica estéril 21G - 40/8 (1½")',code:"DES-012"},
+    {id:"des013",name:'Agujas hipodérmica estéril 21G - 25/8 (1")',code:"DES-013"},
+    {id:"des014",name:'Agujas hipodérmica estéril 18G - 40/12 (1½")',code:"DES-014"},
+    {id:"des015",name:"Alcohol en gel neutro",code:"DES-015"},{id:"des016",name:"Alcohol líquido x 1 Lt 96%",code:"DES-016"},
+    {id:"des017",name:"Alcohol líquido x Lt (70%)",code:"DES-017"},{id:"des018",name:"Algodón (Pack)",code:"DES-018"},
+    {id:"des019",name:"Apósito Transparente con marco de aplicación",code:"DES-019"},
+    {id:"des020",name:"Apósitos estériles (7 x 20cm)",code:"DES-020"},
+    {id:"des021",name:"Apósitos hipoalergénicos (x250un)",code:"DES-021"},
+    {id:"des022",name:"Apósitos protectores (Curitas) (x10Un)",code:"DES-022"},
+    {id:"des023",name:"Barbijos (Pack x50)",code:"DES-023"},{id:"des024",name:"Barbijos NK95",code:"DES-024"},
+    {id:"des025",name:"Batas cortas sin mangas",code:"DES-025"},{id:"des026",name:"Batas largas con puño",code:"DES-026"},
+    {id:"des027",name:"Cubre Camilla",code:"DES-027"},{id:"des028",name:"Bisturi N11",code:"DES-028"},
+    {id:"des029",name:"Bisturi N15",code:"DES-029"},{id:"des030",name:"Bisturi N22",code:"DES-030"},
+    {id:"des031",name:"Butterfly 19",code:"DES-031"},{id:"des032",name:"Butterfly 21",code:"DES-032"},
+    {id:"des033",name:"Butterfly 23",code:"DES-033"},{id:"des034",name:"Butterfly 25",code:"DES-034"},
+    {id:"des035",name:"Campos quirúrgicos estériles (50x50)",code:"DES-035"},
+    {id:"des036",name:"Cánula nasal para adulto (Tipo K-27)",code:"DES-036"},
+    {id:"des037",name:"Cinta hipoalergénica Transpore 3M x Rollo",code:"DES-037"},
+    {id:"des038",name:"Cinta hipoalergénica Micropore 3M x Rollo (PAPEL)",code:"DES-038"},
+    {id:"des039",name:"Cotonetes (x200un)",code:"DES-039"},{id:"des040",name:"Envase estéril descartable",code:"DES-040"},
+    {id:"des041",name:"Electrodos cardiacos 3M (x50)",code:"DES-041"},
+    {id:"des042",name:"Electrodos para RMI con punta de Carbón (x50)",code:"DES-042"},
+    {id:"des043",name:"Etiqueta",code:"DES-043"},
+    {id:"des044",name:"Fundas ecográficas / Preservativos (x144 un)",code:"DES-044"},
+    {id:"des045",name:"Gasa estéril",code:"DES-045"},{id:"des046",name:"Gel x 250ml",code:"DES-046"},
+    {id:"des047",name:"Vaselina sólida x1kg.",code:"DES-047"},{id:"des048",name:"Gel x 3 Lt (5kg)",code:"DES-048"},
+    {id:"des049",name:"Gel x 500ml",code:"DES-049"},{id:"des050",name:"Goma para ligar",code:"DES-050"},
+    {id:"des051",name:"Guantes estériles (6½) xUn",code:"DES-051"},
+    {id:"des052",name:"Guantes estériles pares (7) xUn",code:"DES-052"},
+    {id:"des053",name:"Guantes estériles pares (7½) xUn",code:"DES-053"},
+    {id:"des054",name:"Guantes estériles pares (8) xUn",code:"DES-054"},
+    {id:"des055",name:"Guantes estériles pares (8½) xUn",code:"DES-055"},
+    {id:"des056",name:"Guantes Estériles Polietileno",code:"DES-056"},
+    {id:"des057",name:"Guantes Nitrilo",code:"DES-057"},
+    {id:"des058",name:'Guantes latex talle PAR "M" y "S"',code:"DES-058"},
+    {id:"des059",name:"Guantes Manoplas de Nylon",code:"DES-059"},
+    {id:"des060",name:"Jeringa dual con Espiga TAC (x20) Stellant",code:"DES-060"},
+    {id:"des061",name:"Jeringa dual con espiga y tubo RESO (x50) Spectris",code:"DES-061"},
+    {id:"des062",name:"Jeringas desechables x 10ml",code:"DES-062"},{id:"des063",name:"Jeringas desechables x 20ml",code:"DES-063"},
+    {id:"des064",name:"Jeringas hipodérmicas estériles x 5ml",code:"DES-064"},
+    {id:"des065",name:"Jeringas hipodérmicas estériles x 60ml",code:"DES-065"},
+    {id:"des066",name:"Jeringas Pico a rosca 20ml",code:"DES-066"},{id:"des067",name:"Jeringas Pico a rosca 10ml",code:"DES-067"},
+    {id:"des068",name:"Jeringas Pico a rosca 5ml",code:"DES-068"},
+    {id:"des069",name:'Agujas espinales 22G (3½")',code:"DES-069"},
+    {id:"des070",name:"Llaves 3 vias",code:"DES-070"},{id:"des071",name:"Llaves 3 vias C/ extensión 50Cm",code:"DES-071"},
+    {id:"des072",name:"Máscaras protectoras Faciales",code:"DES-072"},
+    {id:"des073",name:"Media Sábana (0,66 x 1,55mts)",code:"DES-073"},
+    {id:"des074",name:"Pañales descartables (XXL)",code:"DES-074"},
+    {id:"des075",name:"Pasta conductora de EEG",code:"DES-075"},{id:"des076",name:"Pasta conductora TEN20",code:"DES-076"},
+    {id:"des077",name:"Prolongador bifurcado (2 Vías) PB-1000",code:"DES-077"},
+    {id:"des078",name:"Prolongador/Extensor 50 Cm.",code:"DES-078"},
+    {id:"des079",name:"Protectores auditivos descartables",code:"DES-079"},
+    {id:"des080",name:"Rollo de Papel",code:"DES-080"},{id:"des081",name:"Parches Oculares",code:"DES-081"},
+    {id:"des082",name:"Inhalador de oxígeno pediátrico (Tipo K-27) 2m",code:"DES-082"},
+    {id:"des083",name:"Pilas AA",code:"DES-083"},{id:"des084",name:"Pilas AAA",code:"DES-084"},
+    {id:"des085",name:"Sonda Tipo K-33 (Seriografo)",code:"DES-085"},
+    {id:"des086",name:"Sonda Nelaton K-92 - N° 8 - (Seriografo)",code:"DES-086"},
+    {id:"des087",name:"Sonda Foley N° 10 FR",code:"DES-087"},{id:"des088",name:"Sonda Foley N° 12 FR",code:"DES-088"},
+    {id:"des089",name:"Sonda Foley N° 16 FR",code:"DES-089"},{id:"des090",name:"Sonda Foley N° 20 FR",code:"DES-090"},
+    {id:"des091",name:"Sonda gástrica N° 16 (Tipo K10)",code:"DES-091"},
+    {id:"des092",name:"Sonda para alimentación nasogástrica (adultos)",code:"DES-092"},
+    {id:"des093",name:"Sonda para alimentación nasogástrica (prematuros)",code:"DES-093"},
+    {id:"des094",name:"Tubo conector de baja presión RESO-TAC (x50)",code:"DES-094"},
+    {id:"des095",name:"Venda Elástica (10 x 3Mts)",code:"DES-095"},
+    {id:"des096",name:"Sonda K33",code:"DES-096"},{id:"des097",name:"Sonda K92",code:"DES-097"},
+    {id:"des098",name:"Sábanas para camillas con elástico",code:"DES-098"},
+    {id:"des099",name:"Set de infusión, equipo V14",code:"DES-099"},
+    {id:"des100",name:"Venda Cambric (7 Cm)",code:"DES-100"},
+    {id:"des101",name:"Hilo Monofilament Nylon - 3.0",code:"DES-101"},{id:"des102",name:"Hilo Monofilament Nylon - 4.0",code:"DES-102"},
+    {id:"des103",name:"Hilo Monofilament Nylon - 5.0",code:"DES-103"},{id:"des104",name:"Hilo Monofilament Nylon - 6.0",code:"DES-104"},
+    {id:"des105",name:"Hilo Synthetic - 3.0",code:"DES-105"},{id:"des106",name:"Hilo Synthetic - 4.0",code:"DES-106"},
+    {id:"des107",name:"Hilo Synthetic - 5.0",code:"DES-107"},
+    {id:"des108",name:"Caja Acero Inox.",code:"DES-108"},{id:"des109",name:"Material de Esterilización",code:"DES-109"},
+    {id:"des110",name:"Esterilización",code:"DES-110"},{id:"des111",name:"Guía con filtro 0.2 micrones",code:"DES-111"},
+  ]},
+  "Punción":{icon:"🔬",color:"rgba(191,90,242,0.10)",items:[
+    {id:"pun001",name:"Catéter de histerosona 5FRx40cm",code:"PUN-001"},
+    {id:"pun002",name:"Catéter de histerosona 7FRx40",code:"PUN-002"},
+    {id:"pun003",name:"Cateter Trocar Torácico 18FG",code:"PUN-003"},
+    {id:"pun004",name:'Agujas espinales 20G (3½")',code:"PUN-004"},
+    {id:"pun005",name:'Agujas espinales 19G (3½")',code:"PUN-005"},
+    {id:"pun006",name:'Agujas espinales 18G (3½")',code:"PUN-006"},
+    {id:"pun007",name:"Aguja Punta Fina (Punción mama) (5.5 x 40cm)",code:"PUN-007"},
+    {id:"pun008",name:"Aguja Punta Fina (Punción mama) (18GA x 10cm) Argon",code:"PUN-008"},
+    {id:"pun009",name:"Aguja Punta Fina (Punción mama) (14GA x 10cm)",code:"PUN-009"},
+    {id:"pun010",name:"Aguja Huber 19/20G",code:"PUN-010"},
+    {id:"pun011",name:"Aguja (Punción) (18GA x 20cm) Biocore II BR",code:"PUN-011"},
+    {id:"pun012",name:"Aguja (Punción) (16GA x 20cm) Biocore II BR",code:"PUN-012"},
+    {id:"pun013",name:"Aguja (Punción) (14GA x 20cm) Biocore II BR",code:"PUN-013"},
+    {id:"pun014",name:"Marcador Mamawire Fix (18Ga x 10) Histo",code:"PUN-014"},
+    {id:"pun015",name:"Marcador Mamawire (20Ga x 0,7) Histo",code:"PUN-015"},
+    {id:"pun016",name:"Porta Objetos (x50un)",code:"PUN-016"},
+    {id:"pun017",name:"Cepillo Endovaginal",code:"PUN-017"},
+    {id:"pun018",name:"Hisopos Ginecología",code:"PUN-018"},
+  ]},
+  "Ginecología e Instrumental":{icon:"🩺",color:"rgba(255,45,85,0.10)",items:[
+    {id:"gin001",name:"Espátula de madera de AYRE",code:"GIN-001"},{id:"gin002",name:"Pinzas MAIER",code:"GIN-002"},
+    {id:"gin003",name:"Espéculo Vaginal Chico",code:"GIN-003"},{id:"gin004",name:"Espéculo Vaginal Grande",code:"GIN-004"},
+    {id:"gin005",name:"Espéculo Vaginal Mediano",code:"GIN-005"},{id:"gin006",name:"Tijera Quirúrgica",code:"GIN-006"},
+    {id:"gin007",name:"Pinza Maier Recta x 25Cm.",code:"GIN-007"},{id:"gin008",name:"Pinza Halster Bertola x 26Cm",code:"GIN-008"},
+    {id:"gin009",name:"Pinza Kocher Recta x 24Cm",code:"GIN-009"},{id:"gin010",name:"Pinza Foester Recta x 25Cm",code:"GIN-010"},
+    {id:"gin011",name:"Histerómetro Sim",code:"GIN-011"},{id:"gin012",name:"Tijera Sims Uterina Recta x 24Cm",code:"GIN-012"},
+    {id:"gin013",name:"Espéculo Chico",code:"GIN-013"},{id:"gin014",name:"Espéculo Mediano",code:"GIN-014"},
+    {id:"gin015",name:"Espéculo Grande",code:"GIN-015"},{id:"gin016",name:"Caja Porta Materiales",code:"GIN-016"},
+    {id:"gin017",name:"Pinza Adson con Dientes",code:"GIN-017"},{id:"gin018",name:"Pinza Adson SIN Dientes",code:"GIN-018"},
+    {id:"gin019",name:"Mango N°3 - Porta Bisturí N°15",code:"GIN-019"},{id:"gin020",name:"Pinza Halstead Mosquito",code:"GIN-020"},
+    {id:"gin021",name:"Pinza Halstead Mediana",code:"GIN-021"},{id:"gin022",name:"Tijera de Mayo",code:"GIN-022"},
+    {id:"gin023",name:"Tijera Metzenbaum",code:"GIN-023"},{id:"gin024",name:"Separadores Farabeuf Chico",code:"GIN-024"},
+    {id:"gin025",name:"Kit Ginecología",code:"GIN-025"},
+  ]},
+  "Contrastes y Otros":{icon:"🩻",color:"rgba(90,200,250,0.12)",items:[
+    {id:"con001",name:"Contrastes EZCAT / TRIYOSOM",code:"CON-001"},{id:"con002",name:"Contrastes Gadovist Gadolinio",code:"CON-002"},
+    {id:"con003",name:"Contrastes Primovist Bayer",code:"CON-003"},
+    {id:"con004",name:"Contrastes ULTRAVIST 300 BAYER 50ml x48",code:"CON-004"},
+    {id:"con005",name:"Contrastes ULTRAVIST 370 BAYER 50ml x48",code:"CON-005"},
+    {id:"con006",name:"Contrastes ULTRAVIST 370 x 100ml BAYER x36",code:"CON-006"},
+    {id:"con007",name:"Contrastes ULTRAVIST 300 x 100ml BAYER x36",code:"CON-007"},
+    {id:"con008",name:"Accesorio para contraste Colon",code:"CON-008"},
+    {id:"con009",name:"Gastropaque F - 500 Ml.",code:"CON-009"},
+    {id:"con010",name:"Gastropaque S - 340 Gr. c/ Efervecente",code:"CON-010"},
+    {id:"con011",name:"Gastropaque S - 300 Gr. s/ Efervecente",code:"CON-011"},
+    {id:"con012",name:"Xenetic - 350x100",code:"CON-012"},{id:"con013",name:"Xenetrix 350x50",code:"CON-013"},
+    {id:"con014",name:"Xenetrix 300x50",code:"CON-014"},
+  ]},
+  "Medicamentos":{icon:"💊",color:"rgba(48,209,88,0.10)",items:[
+    {id:"med001",name:"Triamcinolona 6 mg/ml",code:"MED-001"},{id:"med002",name:"Lidocaína Gel pomo (25ml)",code:"MED-002"},
+    {id:"med003",name:"Dipirona 1 Amp. 1 Ml.",code:"MED-003"},{id:"med004",name:"Ketorolac 30mg. 2Ml.",code:"MED-004"},
+    {id:"med005",name:"Metoclopramida ampolla (2ml)",code:"MED-005"},{id:"med006",name:"Ondansetron (8ml)",code:"MED-006"},
+    {id:"med007",name:"Heparina sódica (5ml)",code:"MED-007"},{id:"med008",name:"Hidrocortisona crema (15mg)",code:"MED-008"},
+    {id:"med009",name:"Hioscina – Buscapina ampolla (1ml)",code:"MED-009"},{id:"med010",name:"Dexametasona ampolla (2ml)",code:"MED-010"},
+    {id:"med011",name:"Propofol 10 Ml. Ampolla",code:"MED-011"},{id:"med012",name:"Hidrocortisona ampolla/polvo (100mg)",code:"MED-012"},
+    {id:"med013",name:"Hidrocortisona ampolla/polvo (500mg)",code:"MED-013"},{id:"med014",name:"Lidocaína ampolla LAVIMAR (5ml)",code:"MED-014"},
+    {id:"med015",name:"Lidocaína Amp. C/Epinefrina",code:"MED-015"},{id:"med016",name:"Iodopovidona en Spray (Pervinox)",code:"MED-016"},
+    {id:"med017",name:"Iodopovidona x 100 ml.",code:"MED-017"},{id:"med018",name:"Iodopovidona x 5Lt",code:"MED-018"},
+    {id:"med019",name:"Difenhidramina clorhidrato ampolla (10mg)",code:"MED-019"},{id:"med020",name:"Atropina Sulfato (1ml)",code:"MED-020"},
+    {id:"med021",name:"Ranitidina 50mg",code:"MED-021"},{id:"med022",name:"Diclofenac 75mg",code:"MED-022"},
+    {id:"med023",name:"Sevorane / Sevoflurano",code:"MED-023"},
+    {id:"med024",name:"Percloruro Férrico (Solución Monsel) 10 Ml.",code:"MED-024"},
+    {id:"med025",name:"Solución de ácido acético (500ml)",code:"MED-025"},{id:"med026",name:"Solución de Dextrosa 5%",code:"MED-026"},
+    {id:"med027",name:"Solución de Lugol (500ml)",code:"MED-027"},{id:"med028",name:"Solución de manitol al 15% (500ml)",code:"MED-028"},
+    {id:"med029",name:"Solución Fisiológica ampolla",code:"MED-029"},
+    {id:"med030",name:"Spray Sanitizante de piel con Clorhexidina (x120ml)",code:"MED-030"},
+    {id:"med031",name:"Solución Ringer Lactato",code:"MED-031"},
+    {id:"med032",name:"Suero (solución cloruro de sodio) (100ml)",code:"MED-032"},
+    {id:"med033",name:"Suero (solución cloruro de sodio) (250ml)",code:"MED-033"},
+    {id:"med034",name:"Corteroid Retard ampolla (2ml)",code:"MED-034"},{id:"med035",name:"Adrenalina ampolla (1ml)",code:"MED-035"},
+    {id:"med036",name:"Agua destilada 500 Ml.",code:"MED-036"},{id:"med037",name:"Agua destilada ampolla",code:"MED-037"},
+    {id:"med038",name:"Agua oxigenada x 1 Lt.",code:"MED-038"},{id:"med039",name:"Novaxil",code:"MED-039"},
+    {id:"med040",name:"Ácido Tricloroacético 3% 250 Ml.",code:"MED-040"},
+    {id:"med041",name:"Suero (solución cloruro de sodio) (500ml)",code:"MED-041"},
+    {id:"med042",name:"Midazolam 15Mg. - Amp.",code:"MED-042"},{id:"med043",name:"Fentanilo",code:"MED-043"},
+    {id:"med044",name:"Mamografía Iny. Carbón Activado",code:"MED-044"},{id:"med045",name:"Carbón Activado al 4%",code:"MED-045"},
+  ]},
+  "Impresiones y Oficina":{icon:"🖨️",color:"rgba(255,149,0,0.12)",items:[
+    {id:"imp001",name:"Hoja membretada/QR",code:"IMP-001"},{id:"imp002",name:"Sobre 19×24 (x250)",code:"IMP-002"},
+    {id:"imp003",name:"Sobre 12×35 (x500)",code:"IMP-003"},{id:"imp004",name:"Sobres Oficio",code:"IMP-004"},
+    {id:"imp005",name:"Pen Drive",code:"IMP-005"},{id:"imp006",name:"Entrega Digital – Keyra",code:"IMP-006"},
+    {id:"imp007",name:"Cajas de resmas (x12)",code:"IMP-007"},{id:"imp008",name:"CD 8 Gb.",code:"IMP-008"},
+  ]},
 };
 
-const CAT_COLORS = {
-  "Descartables":               "rgba(0,122,255,0.14)",
-  "Punción":                    "rgba(191,90,242,0.10)",
-  "Ginecología e Instrumental": "rgba(255,45,85,0.10)",
-  "Medicamentos":               "rgba(48,209,88,0.10)",
-  "Contrastes y Otros":         "rgba(90,200,250,0.12)",
-  "Impresiones y Oficina":      "rgba(255,149,0,0.12)",
-  "Otros":                      "rgba(0,0,0,0.07)",
-};
+const CAT_COLORS = {"Descartables":"rgba(0,122,255,0.14)","Punción":"rgba(191,90,242,0.10)","Ginecología e Instrumental":"rgba(255,45,85,0.10)","Medicamentos":"rgba(48,209,88,0.10)","Contrastes y Otros":"rgba(90,200,250,0.12)","Impresiones y Oficina":"rgba(255,149,0,0.12)","Otros":"rgba(0,0,0,0.07)"};
+const CAT_ICONS  = {"Descartables":"💉","Punción":"🔬","Ginecología e Instrumental":"🩺","Medicamentos":"💊","Contrastes y Otros":"🩻","Impresiones y Oficina":"🖨️","Otros":"📋"};
+const CENTERS    = ["GN","Sarmiento"];
 
-const CAT_ICONS = {
-  "Descartables":"💉","Punción":"🔬","Ginecología e Instrumental":"🩺",
-  "Medicamentos":"💊","Contrastes y Otros":"🩻","Impresiones y Oficina":"🖨️","Otros":"📋"
-};
+// ─── State ───────────────────────────────────────────────────────────────────
+function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
-// ─── State (persisted to localStorage) ──────────────────────────────────────
-function buildDefaultSupplies() {
-  const list = [];
-  Object.entries(CATALOG).forEach(([cat, data]) => {
-    data.items.forEach(item => {
-      list.push({
-        id: item.id,
-        name: item.name,
-        code: item.code,
-        category: cat,
-        unit: "UND",
-        price: 0,
-        minStock: 0,
-        active: true
-      });
-    });
-  });
+function buildDefaultSupplies(){
+  const list=[];
+  Object.entries(CATALOG).forEach(([cat,data])=>data.items.forEach(item=>list.push({id:item.id,name:item.name,code:item.code,category:cat,unit:"UND",price:0,minStock:0,active:true})));
   return list;
 }
 
-function load(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-  catch { return fallback; }
+let supplies = load("cima_supplies", buildDefaultSupplies());
+let cs       = load("cima_cs", {GN:{stock:{},movements:[]},Sarmiento:{stock:{},movements:[]}});
+
+// Migration from old single-center keys
+(function(){
+  const oldStock=localStorage.getItem("cima_stock");
+  const oldMov=localStorage.getItem("cima_movements");
+  if(oldStock && !localStorage.getItem("cima_cs")){
+    cs.GN.stock=JSON.parse(oldStock||"{}");
+    cs.GN.movements=JSON.parse(oldMov||"[]");
+    save("cima_cs",cs);
+    localStorage.removeItem("cima_stock");
+    localStorage.removeItem("cima_movements");
+  }
+  CENTERS.forEach(c=>{
+    if(!cs[c])cs[c]={stock:{},movements:[]};
+    supplies.forEach(s=>{if(cs[c].stock[s.id]===undefined)cs[c].stock[s.id]=0;});
+  });
+})();
+
+function persist(){save("cima_supplies",supplies);save("cima_cs",cs);}
+
+let activeCenter="GN", activeCat="Todos", chartDays=7, _charts={}, currentTab="inventario";
+const curStock=()=>cs[activeCenter].stock;
+const curMov=()=>cs[activeCenter].movements;
+
+// ─── Center ──────────────────────────────────────────────────────────────────
+function switchCenter(c){
+  activeCenter=c;
+  document.querySelectorAll(".center-btn").forEach(b=>b.classList.toggle("active",b.dataset.center===c));
+  updateCenterStats();
+  renderCurrentTab();
 }
-function save(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+
+function updateCenterStats(){
+  CENTERS.forEach(c=>{
+    const stk=cs[c].stock;
+    let ok=0,low=0;
+    supplies.filter(s=>s.active).forEach(s=>{
+      const cur=stk[s.id]||0;
+      if(s.minStock>0){if(cur>=s.minStock)ok++;else low++;}
+      else if(cur>0)ok++;
+    });
+    const el=document.getElementById("cs-"+c);
+    if(!el)return;
+    el.innerHTML=`<span class="center-stat-pill csp-ok">${ok} OK</span>${low?`<span class="center-stat-pill csp-warn">${low} bajo</span>`:""}`;
+  });
 }
 
-let supplies   = load("cima_supplies",   buildDefaultSupplies());
-let stock      = load("cima_stock",      {});
-let movements  = load("cima_movements",  []);
-
-// Ensure all supplies have a stock entry
-supplies.forEach(s => { if (stock[s.id] === undefined) stock[s.id] = 0; });
-
-function persist() {
-  save("cima_supplies",  supplies);
-  save("cima_stock",     stock);
-  save("cima_movements", movements);
-}
-
-// ─── Tab switching ───────────────────────────────────────────────────────────
-let currentTab = "inventario";
-let chartDaysRange = 7;
-let _charts = {};
-
-function switchTab(tab, btn) {
-  document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  document.getElementById("tab-" + tab).classList.add("active");
+// ─── Tab ─────────────────────────────────────────────────────────────────────
+function switchTab(tab,btn){
+  document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+tab).classList.add("active");
   btn.classList.add("active");
-  currentTab = tab;
-  if (tab === "inventario")  renderInventario();
-  if (tab === "movimientos") renderMovimientos();
-  if (tab === "graficas")    renderAllCharts();
-  if (tab === "gestion")     renderGestion();
+  currentTab=tab;
+  renderCurrentTab();
+}
+function renderCurrentTab(){
+  if(currentTab==="inventario")  renderInventario();
+  if(currentTab==="movimientos") renderMovimientos();
+  if(currentTab==="graficas")    renderAllCharts();
+  if(currentTab==="gestion")     renderGestion();
 }
 
-// ─── Active category filter ──────────────────────────────────────────────────
-let activeCat = "Todos";
-
-function buildCatFilters() {
-  const el = document.getElementById("invCatFilters");
-  const cats = ["Todos", ...Object.keys(CATALOG), "Otros"];
-  el.innerHTML = cats.map(c =>
-    `<button class="cat-pill${c === activeCat ? " active" : ""}"
-       onclick="setCat('${escAttr(c)}')">${c === "Todos" ? "🌐 Todos" : (CAT_ICONS[c] || "📋") + " " + c}</button>`
-  ).join("");
+// ─── Inventario ──────────────────────────────────────────────────────────────
+function buildCatFilters(){
+  const el=document.getElementById("invCatFilters"); if(!el)return;
+  const cats=["Todos",...Object.keys(CATALOG),"Otros"];
+  el.innerHTML=cats.map(c=>`<button class="cat-pill${c===activeCat?" active":""}" onclick="setCat('${escAttr(c)}')">${c==="Todos"?"🌐 Todos":(CAT_ICONS[c]||"📋")+" "+c}</button>`).join("");
 }
+function setCat(cat){activeCat=cat;buildCatFilters();renderInventario();}
 
-function setCat(cat) {
-  activeCat = cat;
+function renderInventario(){
   buildCatFilters();
-  renderInventario();
-}
-
-// ─── Inventario tab ──────────────────────────────────────────────────────────
-function renderInventario() {
-  buildCatFilters();
-  const q = (document.getElementById("invSearch")?.value || "").toLowerCase().trim();
-  const container = document.getElementById("invContainer");
-  container.innerHTML = "";
-
-  const allCats = getCategories();
-  let totalItems = 0, okItems = 0, lowItems = 0, totalValue = 0;
-
-  allCats.forEach(cat => {
-    if (activeCat !== "Todos" && activeCat !== cat) return;
-
-    const catSupplies = supplies.filter(s =>
-      s.active && s.category === cat &&
-      (!q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
-    );
-    if (!catSupplies.length) return;
-
-    const icon  = CAT_ICONS[cat]  || "📋";
-    const color = CAT_COLORS[cat] || "rgba(0,0,0,0.07)";
-
-    const block = document.createElement("div");
-    block.className = "stock-table glass";
-    block.style.marginBottom = "14px";
-
-    block.innerHTML = `
-      <div class="cat-header-row">
-        <div class="cat-icon-badge" style="background:${color}">${icon}</div>
-        <span class="cat-name">${escHtml(cat)}</span>
-        <span class="cat-count">${catSupplies.length} insumos</span>
-      </div>
-    `;
-
-    catSupplies.forEach(s => {
-      const cur = stock[s.id] || 0;
-      const pct = s.minStock > 0 ? Math.min(cur / (s.minStock * 2), 1) : (cur > 0 ? 0.7 : 0);
-      let lvlClass = "slb-empty", barColor = "#ddd";
-
+  const q=(document.getElementById("invSearch")?.value||"").toLowerCase().trim();
+  const container=document.getElementById("invContainer");
+  if(!container)return;
+  container.innerHTML="";
+  const stk=curStock();
+  let totalItems=0,okItems=0,lowItems=0,totalValue=0;
+  getCategories().forEach(cat=>{
+    if(activeCat!=="Todos"&&activeCat!==cat)return;
+    const catSupplies=supplies.filter(s=>s.active&&s.category===cat&&(!q||s.name.toLowerCase().includes(q)||s.code.toLowerCase().includes(q)));
+    if(!catSupplies.length)return;
+    const icon=CAT_ICONS[cat]||"📋",color=CAT_COLORS[cat]||"rgba(0,0,0,0.07)";
+    const block=document.createElement("div");
+    block.className="stock-table glass"; block.style.marginBottom="14px";
+    block.innerHTML=`<div class="cat-header-row"><div class="cat-icon-badge" style="background:${color}">${icon}</div><span class="cat-name">${escHtml(cat)}</span><span class="cat-count">${catSupplies.length} insumos</span></div>`;
+    catSupplies.forEach(s=>{
+      const cur=stk[s.id]||0;
+      const pct=s.minStock>0?Math.min(cur/(s.minStock*2),1):(cur>0?0.6:0);
+      let lvlClass="slb-empty",barColor="#ddd";
       totalItems++;
-      if (s.minStock > 0) {
-        if (cur >= s.minStock) { lvlClass = "slb-ok"; barColor = "#30D158"; okItems++; }
-        else if (cur > 0)     { lvlClass = "slb-warn"; barColor = "#FF9500"; lowItems++; }
-        else                  { lvlClass = "slb-low";  barColor = "#FF3B30"; lowItems++; }
-      } else {
-        if (cur > 0) okItems++; else lowItems++;
-        lvlClass = cur > 0 ? "slb-ok" : "slb-empty";
-        barColor = cur > 0 ? "#30D158" : "#ddd";
-      }
-
-      totalValue += cur * (s.price || 0);
-
-      const row = document.createElement("div");
-      row.className = "stock-row";
-      row.innerHTML = `
+      if(s.minStock>0){if(cur>=s.minStock){lvlClass="slb-ok";barColor="#30D158";okItems++;}else if(cur>0){lvlClass="slb-warn";barColor="#FF9500";lowItems++;}else{lvlClass="slb-low";barColor="#FF3B30";lowItems++;}}
+      else{if(cur>0){lvlClass="slb-ok";barColor="#30D158";okItems++;}else lowItems++;}
+      totalValue+=cur*(s.price||0);
+      const row=document.createElement("div");
+      row.className="stock-row";
+      row.innerHTML=`
         <div class="stock-info">
           <div class="stock-name">${escHtml(s.name)}</div>
           <div class="stock-meta">
             <span class="stock-code">${escHtml(s.code)}</span>
-            ${s.price > 0 ? `<span class="stock-price-tag">$${fmt(s.price)}</span>` : ""}
+            ${s.price>0?`<span class="stock-price-tag">$${fmt(s.price)}</span>`:""}
           </div>
         </div>
         <div class="stock-controls">
-          <div class="stock-bar-wrap">
-            <div class="stock-bar-fill" style="width:${Math.round(pct*100)}%;background:${barColor}"></div>
-          </div>
+          <div class="stock-bar-wrap"><div class="stock-bar-fill" style="width:${Math.round(pct*100)}%;background:${barColor}"></div></div>
           <span class="stock-level-badge ${lvlClass}">${cur}</span>
           <span class="stock-unit-label">${escHtml(s.unit)}</span>
-          <button class="qty-btn minus" onclick="quickMovimiento('${s.id}','salida')" title="Registrar salida">−</button>
-          <button class="qty-btn plus"  onclick="quickMovimiento('${s.id}','entrada')" title="Registrar entrada">+</button>
-        </div>
-      `;
+          <button class="qty-btn minus" onclick="quickMov('${s.id}','salida')"  title="Salida">−</button>
+          <button class="qty-btn plus"  onclick="quickMov('${s.id}','entrada')" title="Entrada">+</button>
+        </div>`;
       block.appendChild(row);
     });
-
     container.appendChild(block);
   });
-
-  if (!container.children.length) {
-    container.innerHTML = `<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
-  }
-
-  // Update stats
-  document.getElementById("stat-total").textContent = totalItems;
-  document.getElementById("stat-ok").textContent    = okItems;
-  document.getElementById("stat-low").textContent   = lowItems;
-  const vStr = totalValue >= 1000 ? "$" + (totalValue/1000).toFixed(1) + "k" : "$" + Math.round(totalValue);
-  document.getElementById("stat-valor").textContent = vStr;
+  if(!container.children.length)container.innerHTML=`<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
+  document.getElementById("stat-total").textContent=totalItems;
+  document.getElementById("stat-ok").textContent=okItems;
+  document.getElementById("stat-low").textContent=lowItems;
+  const v=totalValue>=1000?"$"+(totalValue/1000).toFixed(1)+"k":"$"+Math.round(totalValue);
+  document.getElementById("stat-valor").textContent=v;
+  updateCenterStats();
 }
+function quickMov(id,type){if(navigator.vibrate)navigator.vibrate(8);openMovModal(id,type);}
 
-function quickMovimiento(supplyId, type) {
-  if (navigator.vibrate) navigator.vibrate(8);
-  openMovModal(supplyId, type);
-}
-
-// ─── Movimientos tab ─────────────────────────────────────────────────────────
-function renderMovimientos() {
-  const container = document.getElementById("movContainer");
-  const from  = document.getElementById("movDateFrom")?.value || "";
-  const to    = document.getElementById("movDateTo")?.value   || "";
-  const ttype = document.getElementById("movTypeFilter")?.value || "";
-
-  const filtered = movements.filter(m => {
-    if (from && m.date < from) return false;
-    if (to   && m.date > to)   return false;
-    if (ttype && m.type !== ttype) return false;
+// ─── Movimientos ─────────────────────────────────────────────────────────────
+function renderMovimientos(){
+  const container=document.getElementById("movContainer"); if(!container)return;
+  const from=document.getElementById("movDateFrom")?.value||"";
+  const to=document.getElementById("movDateTo")?.value||"";
+  const ttype=document.getElementById("movTypeFilter")?.value||"";
+  const filtered=curMov().filter(m=>{
+    if(from&&m.date<from)return false;
+    if(to&&m.date>to)return false;
+    if(ttype&&m.type!==ttype)return false;
     return true;
-  }).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-
-  let totalEntradas = 0, totalSalidas = 0, totalGasto = 0;
-  filtered.forEach(m => {
-    const s = supplies.find(x => x.id === m.supplyId);
-    const price = s?.price || 0;
-    if (m.type === "entrada") totalEntradas += m.qty;
-    else { totalSalidas += m.qty; totalGasto += m.qty * price; }
-  });
-
-  document.getElementById("mov-stat-entradas").textContent = totalEntradas;
-  document.getElementById("mov-stat-salidas").textContent  = totalSalidas;
-  document.getElementById("mov-stat-gasto").textContent    = "$" + fmt(totalGasto);
-
-  if (!filtered.length) {
-    container.innerHTML = `<div class="empty-state glass" style="border-radius:var(--r-xl)">
-      <div class="es-icon">📋</div><p>No hay movimientos en el período seleccionado</p></div>`;
-    return;
-  }
-
-  container.innerHTML = filtered.map(m => {
-    const icon = m.type === "entrada" ? "📥" : "📤";
-    const sign = m.type === "entrada" ? "+" : "−";
-    const s    = supplies.find(x => x.id === m.supplyId);
-    const unit = s?.unit || "UND";
-    const gasto = m.type === "salida" && s?.price ? ` · $${fmt(m.qty * s.price)}` : "";
-    return `
-      <div class="mov-card glass">
-        <div class="mov-type-icon ${m.type}">${icon}</div>
-        <div class="mov-info">
-          <div class="mov-supply-name">${escHtml(m.supplyName)}</div>
-          <div class="mov-details">
-            <span class="mov-date">${fmtDate(m.date)} ${m.time || ""}</span>
-            ${m.note ? `<span class="mov-note">${escHtml(m.note)}</span>` : ""}
-            ${gasto ? `<span class="mov-note" style="color:#1a8f3c">${gasto}</span>` : ""}
-          </div>
+  }).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  let ent=0,sal=0,gasto=0;
+  filtered.forEach(m=>{const s=supplies.find(x=>x.id===m.supplyId);if(m.type==="entrada")ent+=m.qty;else{sal+=m.qty;gasto+=m.qty*(s?.price||0);}});
+  document.getElementById("mov-stat-entradas").textContent=ent;
+  document.getElementById("mov-stat-salidas").textContent=sal;
+  document.getElementById("mov-stat-gasto").textContent="$"+fmt(gasto);
+  if(!filtered.length){container.innerHTML=`<div class="empty-state glass" style="border-radius:var(--r-xl)"><div class="es-icon">📋</div><p>Sin movimientos en el período</p></div>`;return;}
+  container.innerHTML=filtered.map(m=>{
+    const s=supplies.find(x=>x.id===m.supplyId);
+    const unit=s?.unit||"UND";
+    const sign=m.type==="entrada"?"+":"−";
+    const icon=m.type==="entrada"?"📥":"📤";
+    const gastoTag=m.type==="salida"&&s?.price?` · $${fmt(m.qty*s.price)}`:"";
+    return `<div class="mov-card glass">
+      <div class="mov-type-icon ${m.type}">${icon}</div>
+      <div class="mov-info">
+        <div class="mov-supply-name">${escHtml(m.supplyName)}</div>
+        <div class="mov-details">
+          <span class="mov-date">${fmtDate(m.date)} ${m.time||""}</span>
+          ${m.note?`<span class="mov-note">${escHtml(m.note)}</span>`:""}
+          ${gastoTag?`<span class="mov-note" style="color:#1a8f3c">${gastoTag}</span>`:""}
         </div>
-        <span class="mov-qty-badge ${m.type}">${sign}${m.qty} ${escHtml(unit)}</span>
-        <button class="btn btn-sm btn-red" onclick="deleteMovimiento('${m.id}')" title="Eliminar">✕</button>
-      </div>`;
+      </div>
+      <span class="mov-qty-badge ${m.type}">${sign}${m.qty} ${escHtml(unit)}</span>
+      <button class="btn btn-sm btn-red" onclick="deleteMov('${m.id}')">✕</button>
+    </div>`;
   }).join("");
 }
-
-function deleteMovimiento(id) {
-  openConfirm("¿Eliminar movimiento?", "El stock se revertirá automáticamente.", () => {
-    const m = movements.find(x => x.id === id);
-    if (m) {
-      if (m.type === "entrada") stock[m.supplyId] = (stock[m.supplyId] || 0) - m.qty;
-      else                      stock[m.supplyId] = (stock[m.supplyId] || 0) + m.qty;
-    }
-    movements = movements.filter(x => x.id !== id);
-    persist();
-    renderMovimientos();
-    toast("Movimiento eliminado");
+function deleteMov(id){
+  openConfirm("¿Eliminar movimiento?","El stock se revertirá.",()=>{
+    const movs=curMov();
+    const m=movs.find(x=>x.id===id);
+    if(m){cs[activeCenter].stock[m.supplyId]=(cs[activeCenter].stock[m.supplyId]||0)+(m.type==="entrada"?-m.qty:m.qty);cs[activeCenter].movements=movs.filter(x=>x.id!==id);}
+    persist();renderMovimientos();toast("Movimiento eliminado");
   });
 }
 
 // ─── Charts ──────────────────────────────────────────────────────────────────
-function setChartRange(days, btn) {
-  chartDaysRange = days;
-  document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  renderSalidasChart();
+function setChartRange(d,btn){chartDays=d;document.querySelectorAll(".range-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");renderSalidasChart();}
+function renderAllCharts(){
+  const lbl=document.getElementById("chart-center-label");
+  if(lbl)lbl.textContent=`Unidades salidas del depósito ${activeCenter}`;
+  renderSalidasChart();renderGastoCategoria();renderTopInsumos();buildSupplySelectChart();renderStockChart();
 }
-
-function renderAllCharts() {
-  renderSalidasChart();
-  renderGastoCategoria();
-  renderTopInsumos();
-  buildSupplySelectChart();
+function renderSalidasChart(){
+  const labels=[],data=[],now=new Date(),movs=curMov();
+  for(let i=chartDays-1;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);const key=d.toISOString().slice(0,10);labels.push(fmtDateShort(key));data.push(movs.filter(m=>m.type==="salida"&&m.date===key).reduce((s,m)=>s+m.qty,0));}
+  const ctx=document.getElementById("chartSalidasDia")?.getContext("2d"); if(!ctx)return;
+  if(_charts.sd)_charts.sd.destroy();
+  _charts.sd=new Chart(ctx,{type:"bar",data:{labels,datasets:[{label:"Unidades",data,backgroundColor:"rgba(0,122,255,0.55)",borderRadius:7,borderSkipped:false}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:"rgba(0,0,0,0.06)"},ticks:{font:{size:11}},beginAtZero:true}}}});
+}
+function renderGastoCategoria(){
+  const movs=curMov(),labels=[],data=[],colors=[];
+  const palette=["#007AFF","#30D158","#FF9500","#FF3B30","#BF5AF2","#5AC8FA","#FF2D55","#A2845E"];
+  getCategories().forEach((cat,i)=>{
+    const total=movs.filter(m=>m.type==="salida").reduce((s,m)=>{const sup=supplies.find(x=>x.id===m.supplyId&&x.category===cat);return s+(sup?m.qty*(sup.price||0):0);},0);
+    if(total>0){labels.push(cat);data.push(total);colors.push(palette[i%palette.length]);}
+  });
+  const ctx=document.getElementById("chartGastoCategoria")?.getContext("2d"); if(!ctx)return;
+  if(_charts.gc)_charts.gc.destroy();
+  if(!data.length){ctx.clearRect(0,0,500,500);return;}
+  _charts.gc=new Chart(ctx,{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:"rgba(255,255,255,0.8)"}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11},padding:10}},tooltip:{callbacks:{label:c=>` $${fmt(c.raw)}`}}}}});
+}
+function renderTopInsumos(){
+  const movs=curMov(),totals={};
+  movs.filter(m=>m.type==="salida").forEach(m=>{const s=supplies.find(x=>x.id===m.supplyId);if(!s)return;totals[m.supplyId]=(totals[m.supplyId]||0)+m.qty*(s.price||0);});
+  const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const labels=sorted.map(([id])=>{const s=supplies.find(x=>x.id===id);return s?(s.name.length>24?s.name.slice(0,21)+"…":s.name):id;});
+  const data=sorted.map(([,v])=>v);
+  const ctx=document.getElementById("chartTopInsumos")?.getContext("2d"); if(!ctx)return;
+  if(_charts.ti)_charts.ti.destroy();
+  if(!data.length){ctx.clearRect(0,0,500,500);return;}
+  _charts.ti=new Chart(ctx,{type:"bar",data:{labels,datasets:[{label:"Gasto ($)",data,backgroundColor:"rgba(191,90,242,0.55)",borderRadius:6,borderSkipped:false}]},options:{indexAxis:"y",responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${fmt(c.raw)}`}}},scales:{x:{grid:{color:"rgba(0,0,0,0.06)"},ticks:{font:{size:11},callback:v=>"$"+fmt(v)},beginAtZero:true},y:{grid:{display:false},ticks:{font:{size:11}}}}}});
+}
+function buildSupplySelectChart(){
+  const sel=document.getElementById("chartSupplySelect"); if(!sel)return;
+  sel.innerHTML=supplies.filter(s=>s.active).map(s=>`<option value="${escAttr(s.id)}">${escHtml(s.name)} (${escHtml(s.code)})</option>`).join("");
   renderStockChart();
 }
-
-function renderSalidasChart() {
-  const days = chartDaysRange;
-  const labels = [], data = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    labels.push(fmtDateShort(key));
-    const total = movements
-      .filter(m => m.type === "salida" && m.date === key)
-      .reduce((s, m) => s + m.qty, 0);
-    data.push(total);
-  }
-
-  const ctx = document.getElementById("chartSalidasDia").getContext("2d");
-  if (_charts.salidasDia) _charts.salidasDia.destroy();
-  _charts.salidasDia = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "Unidades",
-        data,
-        backgroundColor: "rgba(0,122,255,0.55)",
-        borderRadius: 7,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-        y: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: { size: 11 } }, beginAtZero: true }
-      }
-    }
-  });
+function renderStockChart(){
+  const sel=document.getElementById("chartSupplySelect"); if(!sel||!sel.value)return;
+  const sid=sel.value;
+  const movs=curMov().filter(m=>m.supplyId===sid).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const ctx=document.getElementById("chartStockEvol")?.getContext("2d"); if(!ctx)return;
+  if(_charts.se)_charts.se.destroy();
+  if(!movs.length){ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);return;}
+  let run=curStock()[sid]||0;
+  [...movs].reverse().forEach(m=>{run+=m.type==="entrada"?-m.qty:m.qty;});
+  const labels=[],data=[];
+  movs.forEach(m=>{run+=m.type==="entrada"?m.qty:-m.qty;labels.push(fmtDate(m.date));data.push(run);});
+  _charts.se=new Chart(ctx,{type:"line",data:{labels,datasets:[{label:"Stock",data,borderColor:"#007AFF",backgroundColor:"rgba(0,122,255,0.10)",borderWidth:2,pointRadius:4,pointBackgroundColor:"#007AFF",fill:true,tension:0.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:"rgba(0,0,0,0.06)"},ticks:{font:{size:11}}}}}});
 }
 
-function renderGastoCategoria() {
-  const cats = getCategories();
-  const labels = [], data = [], colors = [];
-  const palette = ["#007AFF","#30D158","#FF9500","#FF3B30","#BF5AF2","#5AC8FA","#FF2D55","#A2845E"];
-  cats.forEach((cat, i) => {
-    const total = movements
-      .filter(m => m.type === "salida")
-      .reduce((sum, m) => {
-        const s = supplies.find(x => x.id === m.supplyId && x.category === cat);
-        return sum + (s ? m.qty * (s.price || 0) : 0);
-      }, 0);
-    if (total > 0) { labels.push(cat); data.push(total); colors.push(palette[i % palette.length]); }
-  });
-
-  const ctx = document.getElementById("chartGastoCategoria").getContext("2d");
-  if (_charts.gastoCat) _charts.gastoCat.destroy();
-  if (!data.length) { ctx.clearRect(0,0,500,500); return; }
-  _charts.gastoCat = new Chart(ctx, {
-    type: "doughnut",
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: "rgba(255,255,255,0.8)" }] },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: "bottom", labels: { font: { size: 11 }, padding: 10 } },
-        tooltip: { callbacks: { label: ctx => ` $${fmt(ctx.raw)}` } }
-      }
-    }
-  });
-}
-
-function renderTopInsumos() {
-  const totals = {};
-  movements.filter(m => m.type === "salida").forEach(m => {
-    const s = supplies.find(x => x.id === m.supplyId);
-    if (!s) return;
-    totals[m.supplyId] = (totals[m.supplyId] || 0) + m.qty * (s.price || 0);
-  });
-  const sorted = Object.entries(totals).sort((a,b) => b[1]-a[1]).slice(0,10);
-  const labels = sorted.map(([id]) => {
-    const s = supplies.find(x => x.id === id);
-    return s ? (s.name.length > 25 ? s.name.slice(0,22) + "…" : s.name) : id;
-  });
-  const data = sorted.map(([,v]) => v);
-
-  const ctx = document.getElementById("chartTopInsumos").getContext("2d");
-  if (_charts.topIns) _charts.topIns.destroy();
-  if (!data.length) { ctx.clearRect(0,0,500,500); return; }
-  _charts.topIns = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "Gasto ($)",
-        data,
-        backgroundColor: "rgba(191,90,242,0.55)",
-        borderRadius: 6,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` $${fmt(ctx.raw)}` } }
-      },
-      scales: {
-        x: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: { size: 11 }, callback: v => "$"+fmt(v) }, beginAtZero: true },
-        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
-      }
-    }
-  });
-}
-
-function buildSupplySelectChart() {
-  const sel = document.getElementById("chartSupplySelect");
-  if (!sel) return;
-  const active = supplies.filter(s => s.active);
-  sel.innerHTML = active.map(s =>
-    `<option value="${escAttr(s.id)}">${escHtml(s.name)} (${escHtml(s.code)})</option>`
-  ).join("");
-  renderStockChart();
-}
-
-function renderStockChart() {
-  const sel = document.getElementById("chartSupplySelect");
-  if (!sel || !sel.value) return;
-  const supplyId = sel.value;
-
-  const relMov = movements
-    .filter(m => m.supplyId === supplyId)
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-
-  if (!relMov.length) {
-    const ctx = document.getElementById("chartStockEvol").getContext("2d");
-    if (_charts.stockEvol) _charts.stockEvol.destroy();
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    return;
-  }
-
-  let runStock = stock[supplyId] || 0;
-  const reversed = [...relMov].reverse();
-  reversed.forEach(m => {
-    if (m.type === "entrada") runStock -= m.qty;
-    else runStock += m.qty;
-  });
-
-  const labels = [], data = [];
-  let cur = runStock;
-  relMov.forEach(m => {
-    if (m.type === "entrada") cur += m.qty;
-    else cur -= m.qty;
-    labels.push(fmtDate(m.date));
-    data.push(cur);
-  });
-
-  const ctx = document.getElementById("chartStockEvol").getContext("2d");
-  if (_charts.stockEvol) _charts.stockEvol.destroy();
-  _charts.stockEvol = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: "Stock",
-        data,
-        borderColor: "#007AFF",
-        backgroundColor: "rgba(0,122,255,0.10)",
-        borderWidth: 2,
-        pointRadius: 4,
-        pointBackgroundColor: "#007AFF",
-        fill: true,
-        tension: 0.3
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-        y: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: { size: 11 } }, beginAtZero: false }
-      }
-    }
-  });
-}
-
-// ─── Gestión tab ─────────────────────────────────────────────────────────────
-function renderGestion() {
-  const q = (document.getElementById("gestionSearch")?.value || "").toLowerCase();
-  const container = document.getElementById("gestionContainer");
-  container.innerHTML = "";
-
-  const allCats = getCategories();
-  allCats.forEach(cat => {
-    const catList = supplies.filter(s =>
-      s.category === cat && s.active &&
-      (!q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
-    );
-    if (!catList.length) return;
-
-    const icon  = CAT_ICONS[cat]  || "📋";
-    const color = CAT_COLORS[cat] || "rgba(0,0,0,0.07)";
-
-    const block = document.createElement("div");
-    block.className = "gestion-table glass";
-    block.style.marginBottom = "14px";
-
-    block.innerHTML = `
-      <div class="cat-header-row">
-        <div class="cat-icon-badge" style="background:${color}">${icon}</div>
-        <span class="cat-name">${escHtml(cat)}</span>
-        <span class="cat-count">${catList.length} insumos</span>
-      </div>
-    `;
-
-    catList.forEach(s => {
-      const row = document.createElement("div");
-      row.className = "gestion-row";
-      row.innerHTML = `
-        <div class="gestion-info">
-          <div class="gestion-name">${escHtml(s.name)}</div>
-          <div class="gestion-sub">${escHtml(s.code)} · ${escHtml(s.unit)}</div>
-        </div>
-        <div class="price-input-wrap">
-          <span class="price-prefix">$</span>
-          <input class="price-input" type="number" min="0" step="0.01"
-                 value="${s.price || 0}"
-                 onchange="updatePrice('${s.id}', this.value)"
-                 placeholder="Precio" title="Precio por unidad" />
-        </div>
-        <div style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:11px;color:var(--text-secondary)">Mín:</span>
-          <input class="min-stock-input" type="number" min="0"
-                 value="${s.minStock || 0}"
-                 onchange="updateMinStock('${s.id}', this.value)"
-                 placeholder="0" title="Stock mínimo" />
-        </div>
-        <div class="gestion-actions">
-          <button class="btn btn-sm btn-red" onclick="deleteSupply('${s.id}')">✕</button>
-        </div>
-      `;
+// ─── Gestión ─────────────────────────────────────────────────────────────────
+function renderGestion(){
+  const q=(document.getElementById("gestionSearch")?.value||"").toLowerCase();
+  const el=document.getElementById("gestionContainer"); if(!el)return;
+  el.innerHTML="";
+  getCategories().forEach(cat=>{
+    const list=supplies.filter(s=>s.category===cat&&s.active&&(!q||s.name.toLowerCase().includes(q)||s.code.toLowerCase().includes(q)));
+    if(!list.length)return;
+    const icon=CAT_ICONS[cat]||"📋",color=CAT_COLORS[cat]||"rgba(0,0,0,0.07)";
+    const block=document.createElement("div"); block.className="gestion-table glass"; block.style.marginBottom="14px";
+    block.innerHTML=`<div class="cat-header-row"><div class="cat-icon-badge" style="background:${color}">${icon}</div><span class="cat-name">${escHtml(cat)}</span><span class="cat-count">${list.length} insumos</span></div>`;
+    list.forEach(s=>{
+      const row=document.createElement("div"); row.className="gestion-row";
+      row.innerHTML=`
+        <div class="gestion-info"><div class="gestion-name">${escHtml(s.name)}</div><div class="gestion-sub">${escHtml(s.code)} · ${escHtml(s.unit)}</div></div>
+        <div class="price-input-wrap"><span class="price-prefix">$</span><input class="price-input" type="number" min="0" step="0.01" value="${s.price||0}" onchange="updatePrice('${s.id}',this.value)" title="Precio por unidad" /></div>
+        <div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--text-secondary)">Mín:</span><input class="min-stock-input" type="number" min="0" value="${s.minStock||0}" onchange="updateMinStock('${s.id}',this.value)" /></div>
+        <button class="btn btn-sm btn-red" onclick="archiveSupply('${s.id}')">✕</button>`;
       block.appendChild(row);
     });
-
-    container.appendChild(block);
+    el.appendChild(block);
   });
-
-  if (!container.children.length) {
-    container.innerHTML = `<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
-  }
+  if(!el.children.length)el.innerHTML=`<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
 }
-
-function updatePrice(id, val) {
-  const s = supplies.find(x => x.id === id);
-  if (s) { s.price = parseFloat(val) || 0; persist(); toast("Precio actualizado"); }
-}
-
-function updateMinStock(id, val) {
-  const s = supplies.find(x => x.id === id);
-  if (s) { s.minStock = parseInt(val) || 0; persist(); }
-}
-
-function deleteSupply(id) {
-  const s = supplies.find(x => x.id === id);
-  openConfirm(`¿Archivar "${s?.name}"?`, "El insumo se ocultará del inventario.", () => {
-    const found = supplies.find(x => x.id === id);
-    if (found) found.active = false;
-    persist();
-    renderGestion();
-    if (currentTab === "inventario") renderInventario();
-    toast("Insumo archivado");
+function updatePrice(id,val){const s=supplies.find(x=>x.id===id);if(s){s.price=parseFloat(val)||0;persist();toast("Precio actualizado");}}
+function updateMinStock(id,val){const s=supplies.find(x=>x.id===id);if(s){s.minStock=parseInt(val)||0;persist();}}
+function archiveSupply(id){
+  const s=supplies.find(x=>x.id===id);
+  openConfirm(`¿Archivar "${s?.name}"?`,"Se ocultará del inventario.",()=>{
+    const f=supplies.find(x=>x.id===id);if(f)f.active=false;
+    persist();renderGestion();if(currentTab==="inventario")renderInventario();toast("Insumo archivado");
   });
 }
 
-// ─── Modal: Movimiento ───────────────────────────────────────────────────────
-let _movType = "entrada";
-let _preselectedId = null;
-
-function openMovModal(supplyId, type) {
-  _movType = type || "entrada";
-  _preselectedId = supplyId;
-
-  const modal = document.getElementById("movModal");
-  document.getElementById("movModalTitle").textContent = type === "entrada" ? "Registrar Entrada" : "Registrar Salida";
-
-  // Populate supply select
-  const sel = document.getElementById("movSupplySelect");
-  const active = supplies.filter(s => s.active).sort((a,b) => a.name.localeCompare(b.name));
-  sel.innerHTML = `<option value="">— Seleccionar insumo —</option>` +
-    active.map(s => `<option value="${escAttr(s.id)}">${escHtml(s.name)} (${escHtml(s.code)})</option>`).join("");
-
-  if (supplyId) sel.value = supplyId;
-
-  document.getElementById("movQty").value  = "";
-  document.getElementById("movDate").valueAsDate = new Date();
-  document.getElementById("movNote").value = "";
-
+// ─── Modal Movimiento ─────────────────────────────────────────────────────────
+let _movType="entrada";
+function openMovModal(supplyId,type){
+  _movType=type||"entrada";
+  document.getElementById("movModalTitle").textContent=type==="entrada"?"Registrar Entrada":"Registrar Salida";
+  const sel=document.getElementById("movSupplySelect");
+  const actv=supplies.filter(s=>s.active).sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML=`<option value="">— Seleccionar insumo —</option>`+actv.map(s=>`<option value="${escAttr(s.id)}">${escHtml(s.name)} (${escHtml(s.code)})</option>`).join("");
+  if(supplyId)sel.value=supplyId;
+  document.getElementById("movQty").value="";
+  document.getElementById("movDate").valueAsDate=new Date();
+  document.getElementById("movNote").value="";
   selectMovType(_movType);
-  modal.classList.add("open");
+  document.getElementById("movModal").classList.add("open");
 }
-
-function closeMovModal(e) {
-  if (e && e.target !== document.getElementById("movModal")) return;
-  document.getElementById("movModal").classList.remove("open");
-}
-
-function selectMovType(type) {
-  _movType = type;
-  document.getElementById("togEntrada").classList.toggle("selected", type === "entrada");
-  document.getElementById("togSalida").classList.toggle("selected", type === "salida");
-}
-
-function saveMovimiento() {
-  const supplyId = document.getElementById("movSupplySelect").value;
-  const qty = parseInt(document.getElementById("movQty").value);
-  const date = document.getElementById("movDate").value;
-  const note = document.getElementById("movNote").value.trim();
-
-  if (!supplyId) { toast("⚠️ Seleccioná un insumo"); return; }
-  if (!qty || qty <= 0) { toast("⚠️ Ingresá una cantidad válida"); return; }
-  if (!date) { toast("⚠️ Seleccioná una fecha"); return; }
-
-  const s = supplies.find(x => x.id === supplyId);
-  if (!s) return;
-
-  const now = new Date();
-  const mov = {
-    id:         "mov_" + Date.now(),
-    supplyId,
-    supplyName: s.name,
-    type:       _movType,
-    qty,
-    date,
-    time:       now.toTimeString().slice(0, 5),
-    note
-  };
-
-  movements.push(mov);
-
-  if (_movType === "entrada") stock[supplyId] = (stock[supplyId] || 0) + qty;
-  else                        stock[supplyId] = (stock[supplyId] || 0) - qty;
-
+function closeMovModal(e){if(e&&e.target!==document.getElementById("movModal"))return;document.getElementById("movModal").classList.remove("open");}
+function selectMovType(type){_movType=type;document.getElementById("togEntrada").classList.toggle("selected",type==="entrada");document.getElementById("togSalida").classList.toggle("selected",type==="salida");}
+function saveMovimiento(){
+  const supplyId=document.getElementById("movSupplySelect").value;
+  const qty=parseInt(document.getElementById("movQty").value);
+  const date=document.getElementById("movDate").value;
+  const note=document.getElementById("movNote").value.trim();
+  if(!supplyId){toast("⚠️ Seleccioná un insumo");return;}
+  if(!qty||qty<=0){toast("⚠️ Ingresá una cantidad válida");return;}
+  if(!date){toast("⚠️ Seleccioná una fecha");return;}
+  const s=supplies.find(x=>x.id===supplyId); if(!s)return;
+  const mov={id:"mov_"+Date.now(),supplyId,supplyName:s.name,type:_movType,qty,date,time:new Date().toTimeString().slice(0,5),note};
+  cs[activeCenter].movements.push(mov);
+  cs[activeCenter].stock[supplyId]=(cs[activeCenter].stock[supplyId]||0)+(_movType==="entrada"?qty:-qty);
   persist();
-
   document.getElementById("movModal").classList.remove("open");
-
-  const typeLabel = _movType === "entrada" ? "Entrada" : "Salida";
-  toast(`✓ ${typeLabel} registrada: ${qty} ${s.unit} de ${s.name}`);
-
-  if (navigator.vibrate) navigator.vibrate([8, 50, 8]);
-
-  if (currentTab === "inventario")  renderInventario();
-  if (currentTab === "movimientos") renderMovimientos();
-  if (currentTab === "graficas")    renderAllCharts();
+  toast(`✓ ${_movType==="entrada"?"Entrada":"Salida"} registrada: ${qty} ${s.unit} de ${s.name}`);
+  if(navigator.vibrate)navigator.vibrate([8,50,8]);
+  renderCurrentTab();
 }
 
-// ─── Modal: Agregar Insumo ───────────────────────────────────────────────────
-let _editingSupplyId = null;
-
-function openAddModal(id) {
-  _editingSupplyId = id || null;
-  const modal = document.getElementById("addModal");
-  document.getElementById("addModalTitle").textContent = id ? "Editar insumo" : "Nuevo insumo";
-
-  if (id) {
-    const s = supplies.find(x => x.id === id);
-    if (s) {
-      document.getElementById("addName").value     = s.name;
-      document.getElementById("addCode").value     = s.code;
-      document.getElementById("addCategory").value = s.category;
-      document.getElementById("addUnit").value     = s.unit;
-      document.getElementById("addPrice").value    = s.price || 0;
-      document.getElementById("addMinStock").value = s.minStock || 0;
-      document.getElementById("addInitStock").value= stock[id] || 0;
-    }
-  } else {
-    document.getElementById("addName").value      = "";
-    document.getElementById("addCode").value      = "";
-    document.getElementById("addCategory").value  = "Descartables";
-    document.getElementById("addUnit").value      = "UND";
-    document.getElementById("addPrice").value     = "";
-    document.getElementById("addMinStock").value  = "";
-    document.getElementById("addInitStock").value = "";
-  }
-
-  modal.classList.add("open");
+// ─── Modal Agregar ────────────────────────────────────────────────────────────
+let _editId=null;
+function openAddModal(id){
+  _editId=id||null;
+  document.getElementById("addModalTitle").textContent=id?"Editar insumo":"Nuevo insumo";
+  if(id){const s=supplies.find(x=>x.id===id);if(s){document.getElementById("addName").value=s.name;document.getElementById("addCode").value=s.code;document.getElementById("addCategory").value=s.category;document.getElementById("addUnit").value=s.unit;document.getElementById("addPrice").value=s.price||0;document.getElementById("addMinStock").value=s.minStock||0;document.getElementById("addInitStock").value=cs[activeCenter].stock[id]||0;}}
+  else{["addName","addCode","addPrice","addMinStock","addInitStock"].forEach(i=>document.getElementById(i).value="");document.getElementById("addCategory").value="Descartables";document.getElementById("addUnit").value="UND";}
+  document.getElementById("addModal").classList.add("open");
 }
-
-function closeAddModal(e) {
-  if (e && e.target !== document.getElementById("addModal")) return;
-  document.getElementById("addModal").classList.remove("open");
-}
-
-function saveSupply() {
-  const name     = document.getElementById("addName").value.trim();
-  const code     = document.getElementById("addCode").value.trim();
-  const category = document.getElementById("addCategory").value;
-  const unit     = document.getElementById("addUnit").value;
-  const price    = parseFloat(document.getElementById("addPrice").value) || 0;
-  const minStock = parseInt(document.getElementById("addMinStock").value) || 0;
-  const initStk  = parseInt(document.getElementById("addInitStock").value) || 0;
-
-  if (!name) { toast("⚠️ Ingresá el nombre del insumo"); return; }
-
-  if (_editingSupplyId) {
-    const s = supplies.find(x => x.id === _editingSupplyId);
-    if (s) {
-      s.name = name; s.code = code; s.category = category;
-      s.unit = unit; s.price = price; s.minStock = minStock;
-      stock[s.id] = initStk;
-    }
+function closeAddModal(e){if(e&&e.target!==document.getElementById("addModal"))return;document.getElementById("addModal").classList.remove("open");}
+function saveSupply(){
+  const name=document.getElementById("addName").value.trim();
+  const code=document.getElementById("addCode").value.trim();
+  const category=document.getElementById("addCategory").value;
+  const unit=document.getElementById("addUnit").value;
+  const price=parseFloat(document.getElementById("addPrice").value)||0;
+  const minStock=parseInt(document.getElementById("addMinStock").value)||0;
+  const initStk=parseInt(document.getElementById("addInitStock").value)||0;
+  if(!name){toast("⚠️ Ingresá el nombre del insumo");return;}
+  if(_editId){
+    const s=supplies.find(x=>x.id===_editId);
+    if(s){Object.assign(s,{name,code,category,unit,price,minStock});cs[activeCenter].stock[s.id]=initStk;}
     toast("✓ Insumo actualizado");
-  } else {
-    const id = "cus_" + Date.now();
-    supplies.push({ id, name, code: code || "USR-" + supplies.length, category, unit, price, minStock, active: true });
-    stock[id] = initStk;
-    if (initStk > 0) {
-      movements.push({
-        id: "mov_init_" + id,
-        supplyId: id, supplyName: name,
-        type: "entrada", qty: initStk,
-        date: new Date().toISOString().slice(0,10),
-        time: new Date().toTimeString().slice(0,5),
-        note: "Stock inicial"
-      });
-    }
-    toast("✓ Insumo agregado al inventario");
+  }else{
+    const id="cus_"+Date.now();
+    supplies.push({id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true});
+    CENTERS.forEach(c=>{if(!cs[c].stock[id])cs[c].stock[id]=0;});
+    cs[activeCenter].stock[id]=initStk;
+    if(initStk>0)cs[activeCenter].movements.push({id:"mov_init_"+id,supplyId:id,supplyName:name,type:"entrada",qty:initStk,date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),note:"Stock inicial"});
+    toast("✓ Insumo agregado");
   }
-
   persist();
   document.getElementById("addModal").classList.remove("open");
   renderGestion();
-  if (currentTab === "inventario") renderInventario();
+  if(currentTab==="inventario")renderInventario();
 }
 
-// ─── Confirm dialog ──────────────────────────────────────────────────────────
-let _confirmCb = null;
-function openConfirm(title, msg, cb) {
-  _confirmCb = cb;
-  document.getElementById("confirmTitle").textContent = title;
-  document.getElementById("confirmMsg").textContent   = msg;
-  document.getElementById("confirmOkBtn").onclick     = () => { closeConfirm(); cb(); };
-  document.getElementById("confirmOverlay").classList.add("open");
-}
-function closeConfirm() {
-  document.getElementById("confirmOverlay").classList.remove("open");
-}
+// ─── Confirm ─────────────────────────────────────────────────────────────────
+function openConfirm(title,msg,cb){document.getElementById("confirmTitle").textContent=title;document.getElementById("confirmMsg").textContent=msg;document.getElementById("confirmOkBtn").onclick=()=>{closeConfirm();cb();};document.getElementById("confirmOverlay").classList.add("open");}
+function closeConfirm(){document.getElementById("confirmOverlay").classList.remove("open");}
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
-function toast(msg) {
-  const c = document.getElementById("toastContainer");
-  const t = document.createElement("div");
-  t.className = "toast"; t.textContent = msg;
-  c.appendChild(t);
-  setTimeout(() => t.remove(), 2800);
-}
+function toast(msg){const c=document.getElementById("toastContainer");const t=document.createElement("div");t.className="toast";t.textContent=msg;c.appendChild(t);setTimeout(()=>t.remove(),2800);}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function escHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-function escAttr(s) { return escHtml(s); }
-function fmt(n) {
-  if (!n && n !== 0) return "0";
-  return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
-function fmtDate(d) {
-  if (!d) return "";
-  const [y,m,day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-function fmtDateShort(d) {
-  if (!d) return "";
-  const [,m,day] = d.split("-");
-  return `${day}/${m}`;
-}
-function getCategories() {
-  const fromCatalog = Object.keys(CATALOG);
-  const custom      = [...new Set(supplies.filter(s => s.active && !fromCatalog.includes(s.category)).map(s => s.category))];
-  return [...fromCatalog, ...custom];
-}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function escAttr(s){return escHtml(s);}
+function fmt(n){return Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:2});}
+function fmtDate(d){if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;}
+function fmtDateShort(d){if(!d)return"";const[,m,day]=d.split("-");return`${day}/${m}`;}
+function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supplies.filter(s=>s.active&&!fc.includes(s.category)).map(s=>s.category))];return[...fc,...cu];}
 
 // ─── Init ────────────────────────────────────────────────────────────────────
-(function init() {
-  // Set default date range for movements (last 30 days)
-  const today = new Date().toISOString().slice(0,10);
-  const d30   = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
-  const fromEl = document.getElementById("movDateFrom");
-  const toEl   = document.getElementById("movDateTo");
-  if (fromEl) fromEl.value = d30;
-  if (toEl)   toEl.value   = today;
-
+(function(){
+  const today=new Date().toISOString().slice(0,10);
+  const d30=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+  const fe=document.getElementById("movDateFrom"),te=document.getElementById("movDateTo");
+  if(fe)fe.value=d30; if(te)te.value=today;
+  updateCenterStats();
   renderInventario();
 })();
 </script>
