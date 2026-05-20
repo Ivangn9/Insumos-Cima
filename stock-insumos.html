@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="Stock CIMA" />
   <meta name="theme-color" content="#007AFF" />
   <title>Stock de Insumos · CIMA</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -285,6 +288,51 @@
     .btn-refresh.spin .refresh-icon { animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ─── Login overlay ──────────────────────────────── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #cce8f5 0%, #dceefa 45%, #d4ecf7 100%);
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .login-overlay.visible { opacity: 1; pointer-events: auto; }
+    .login-card {
+      width: min(420px, calc(100vw - 40px)); padding: 40px 36px;
+      border-radius: 28px; text-align: center;
+    }
+    .login-logo-wrap { width: 90px; height: 90px; background: white; border-radius: 22px; display: flex; align-items: center; justify-content: center; margin: 0 auto 22px; box-shadow: 0 6px 28px rgba(0,122,255,0.18); }
+    .login-logo { height: 60px; width: auto; object-fit: contain; }
+    .login-title { font-size: 22px; font-weight: 760; letter-spacing: -0.6px; color: var(--text-primary); margin-bottom: 6px; }
+    .login-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 28px; }
+    .btn-google {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 14px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,0.6);
+      background: white; cursor: pointer; font-size: 15px; font-weight: 650;
+      color: var(--text-primary); box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+      transition: transform 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-google:active { transform: scale(0.97); }
+    .btn-google img { width: 20px; height: 20px; }
+    .unauthorized-msg { margin-top: 18px; padding: 14px; border-radius: 14px; background: rgba(255,59,48,0.10); border: 1px solid rgba(255,59,48,0.20); color: var(--red); font-size: 13px; font-weight: 580; display: none; }
+    .login-signout { margin-top: 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; text-decoration: underline; }
+
+    /* ─── User bar ───────────────────────────────────── */
+    .user-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 14px; background: rgba(255,255,255,0.35); border: 1px solid rgba(255,255,255,0.55); margin-left: auto; flex-wrap: wrap; }
+    .user-bar img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); flex-shrink: 0; }
+    .user-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .user-role-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(0,122,255,0.12); color: var(--blue); font-weight: 700; }
+    .btn-signout { padding: 4px 11px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.10); background: rgba(255,255,255,0.5); font-size: 11px; font-weight: 600; color: var(--text-secondary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+    /* ─── Admin section ──────────────────────────────── */
+    .admin-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(0,0,0,0.08); }
+    .admin-section-title { font-size: 16px; font-weight: 720; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .admin-user-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: rgba(255,255,255,0.35); border: 1px solid rgba(255,255,255,0.52); margin-bottom: 8px; }
+    .admin-user-email { flex: 1; font-size: 13px; font-weight: 580; color: var(--text-primary); }
+    .admin-user-role { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(0,122,255,0.10); color: var(--blue); font-weight: 680; }
+    .btn-remove-user { padding: 4px 10px; border-radius: 10px; border: 1px solid rgba(255,59,48,0.25); background: rgba(255,59,48,0.08); color: var(--red); font-size: 11px; font-weight: 650; cursor: pointer; }
+    .admin-add-row { display: flex; gap: 8px; margin-top: 12px; }
+    .admin-add-row input { flex: 1; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.65); background: rgba(255,255,255,0.50); font-size: 13px; font-family: inherit; outline: none; }
+
     /* ─── Update banner ──────────────────────────────── */
     .update-banner {
       position: fixed; top: calc(env(safe-area-inset-top, 0px) + 50px); left: 50%; transform: translateX(-50%) translateY(-80px);
@@ -315,6 +363,28 @@
 </head>
 <body>
 
+<!-- ─── Login overlay ────────────────────────────────── -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card glass">
+    <div class="login-logo-wrap">
+      <img src="logo.png" alt="CIMA" class="login-logo" />
+    </div>
+    <div class="login-title">Stock de Insumos</div>
+    <div class="login-sub">CIMA · Acceso exclusivo para personal autorizado</div>
+    <button class="btn-google" id="loginBtn" onclick="signIn()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+      Iniciar sesión con Google
+    </button>
+    <div class="unauthorized-msg" id="unauthorizedMsg">
+      ⛔ Tu cuenta no está autorizada para acceder a este sistema.<br>Contactá al administrador para solicitar acceso.
+    </div>
+    <div class="login-signout" id="loginSignout" style="display:none" onclick="signOut()">Usar otra cuenta</div>
+  </div>
+</div>
+
+<!-- ─── Main App (visible solo cuando autenticado) ───── -->
+<div id="mainApp" style="display:none">
+
 <!-- ─── Topbar ───────────────────────────────────────── -->
 <div class="topbar">
   <nav class="tab-nav" role="tablist">
@@ -336,6 +406,7 @@
       <h1>Stock de Insumos</h1>
       <p>CIMA · Control de Inventario por Depósito</p>
     </div>
+    <div class="user-bar" id="userBar"></div>
   </header>
 
   <!-- Selector de centro -->
@@ -435,6 +506,16 @@
       <button class="btn btn-primary" onclick="openAddModal()"><span class="btn-icon">+</span> Nuevo insumo</button>
     </div>
     <div id="gestionContainer"></div>
+
+    <!-- Sección admin (solo visible para administradores) -->
+    <div class="admin-section" id="adminSection" style="display:none">
+      <div class="admin-section-title">👥 Gestión de usuarios</div>
+      <div id="adminUserList"><p style="font-size:13px;color:var(--text-secondary)">Cargando usuarios…</p></div>
+      <div class="admin-add-row">
+        <input type="email" id="adminNewEmail" placeholder="Email del nuevo usuario…" />
+        <button class="btn btn-primary" onclick="addAuthorizedUser()" style="white-space:nowrap"><span class="btn-icon">+</span> Agregar</button>
+      </div>
+    </div>
   </div>
 
   <div class="footer">
@@ -528,6 +609,8 @@
   </div>
 </div>
 
+</div><!-- /mainApp -->
+
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ─── Update banner ─────────────────────────────── -->
@@ -539,7 +622,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -755,37 +838,51 @@ const CAT_COLORS = {"Descartables":"rgba(0,122,255,0.14)","Punción":"rgba(191,9
 const CAT_ICONS  = {"Descartables":"💉","Punción":"🔬","Ginecología e Instrumental":"🩺","Medicamentos":"💊","Contrastes y Otros":"🩻","Impresiones y Oficina":"🖨️","Otros":"📋"};
 const CENTERS    = ["GN","Sarmiento"];
 
-// ─── State ───────────────────────────────────────────────────────────────────
-function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
-function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+// ─── Firebase ─────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDpzlN1gaJUH6XGAWv5GRW_suk7zcqKeJE",
+  authDomain: "medtrack-cima-3e9c1.firebaseapp.com",
+  projectId: "medtrack-cima-3e9c1",
+  storageBucket: "medtrack-cima-3e9c1.firebasestorage.app",
+  messagingSenderId: "110780335014",
+  appId: "1:110780335014:web:b991d26e01637bdc884567"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const _auth = firebase.auth();
+const _db   = firebase.firestore();
+_db.enablePersistence().catch(()=>{});
 
+const ADMIN_EMAIL = "ivangarcian@gmail.com";
+const DB_COL      = "insumos_cima";
+const DB_USERS    = "insumos_users";
+
+let currentUser = null, isAdmin = false;
+let _unsubSupplies, _unsubGN, _unsubSarm, _unsubUsers;
+
+// ─── State ───────────────────────────────────────────────────────────────────
 function buildDefaultSupplies(){
   const list=[];
   Object.entries(CATALOG).forEach(([cat,data])=>data.items.forEach(item=>list.push({id:item.id,name:item.name,code:item.code,category:cat,unit:"UND",price:0,minStock:0,active:true})));
   return list;
 }
 
-let supplies = load("cima_supplies", buildDefaultSupplies());
-let cs       = load("cima_cs", {GN:{stock:{},movements:[]},Sarmiento:{stock:{},movements:[]}});
+let supplies = buildDefaultSupplies();
+let cs = {GN:{stock:{},movements:[]},Sarmiento:{stock:{},movements:[]}};
 
-// Migration from old single-center keys
-(function(){
-  const oldStock=localStorage.getItem("cima_stock");
-  const oldMov=localStorage.getItem("cima_movements");
-  if(oldStock && !localStorage.getItem("cima_cs")){
-    cs.GN.stock=JSON.parse(oldStock||"{}");
-    cs.GN.movements=JSON.parse(oldMov||"[]");
-    save("cima_cs",cs);
-    localStorage.removeItem("cima_stock");
-    localStorage.removeItem("cima_movements");
-  }
-  CENTERS.forEach(c=>{
-    if(!cs[c])cs[c]={stock:{},movements:[]};
-    supplies.forEach(s=>{if(cs[c].stock[s.id]===undefined)cs[c].stock[s.id]=0;});
-  });
-})();
-
-function persist(){save("cima_supplies",supplies);save("cima_cs",cs);}
+function persist(){
+  const batch = _db.batch();
+  batch.set(_db.collection(DB_COL).doc("supplies"), {data: supplies});
+  batch.set(_db.collection(DB_COL).doc("center_GN"), cs.GN);
+  batch.set(_db.collection(DB_COL).doc("center_Sarmiento"), cs.Sarmiento);
+  return batch.commit().catch(e=>toast("⚠️ Error guardando: "+e.message));
+}
+function persistCenter(c){
+  const key = c==="GN"?"center_GN":"center_Sarmiento";
+  return _db.collection(DB_COL).doc(key).set(cs[c]).catch(e=>toast("⚠️ Error guardando"));
+}
+function persistSupplies(){
+  return _db.collection(DB_COL).doc("supplies").set({data:supplies}).catch(e=>toast("⚠️ Error guardando"));
+}
 
 let activeCenter="GN", activeCat="Todos", chartDays=7, _charts={}, currentTab="inventario";
 const curStock=()=>cs[activeCenter].stock;
@@ -1119,15 +1216,138 @@ function fmtDate(d){if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m
 function fmtDateShort(d){if(!d)return"";const[,m,day]=d.split("-");return`${day}/${m}`;}
 function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supplies.filter(s=>s.active&&!fc.includes(s.category)).map(s=>s.category))];return[...fc,...cu];}
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+function signIn(){
+  const p=new firebase.auth.GoogleAuthProvider();
+  _auth.signInWithPopup(p).catch(e=>toast("⚠️ Error al iniciar sesión: "+e.message));
+}
+function signOut(){
+  _auth.signOut();
+  if(_unsubSupplies) _unsubSupplies();
+  if(_unsubGN) _unsubGN();
+  if(_unsubSarm) _unsubSarm();
+  if(_unsubUsers) _unsubUsers();
+}
+
+function showLogin(unauthorized){
+  document.getElementById("mainApp").style.display="none";
+  document.getElementById("loginOverlay").classList.add("visible");
+  document.getElementById("unauthorizedMsg").style.display=unauthorized?"block":"none";
+  document.getElementById("loginBtn").style.display=unauthorized?"none":"flex";
+  document.getElementById("loginSignout").style.display=unauthorized?"block":"none";
+}
+function showApp(){
+  document.getElementById("loginOverlay").classList.remove("visible");
+  document.getElementById("mainApp").style.display="";
+  renderUserBar();
+  if(isAdmin) document.getElementById("adminSection").style.display="block";
+}
+
+function renderUserBar(){
+  if(!currentUser)return;
+  const bar=document.getElementById("userBar");
+  bar.innerHTML=`
+    ${currentUser.photoURL?`<img src="${currentUser.photoURL}" alt="" onerror="this.remove()" />`:""}
+    <span class="user-name">${currentUser.displayName||currentUser.email}</span>
+    ${isAdmin?'<span class="user-role-badge">Admin</span>':""}
+    <button class="btn-signout" onclick="signOut()">Salir</button>
+  `;
+}
+
+// ─── Firestore listeners ──────────────────────────────────────────────────────
+function startListeners(){
+  _unsubSupplies = _db.collection(DB_COL).doc("supplies").onSnapshot(snap=>{
+    if(snap.exists && snap.data().data){
+      supplies = snap.data().data;
+      // Ensure all catalog items exist
+      buildDefaultSupplies().forEach(def=>{
+        if(!supplies.find(s=>s.id===def.id)) supplies.push(def);
+      });
+    }
+    CENTERS.forEach(c=>{
+      if(!cs[c]) cs[c]={stock:{},movements:[]};
+      supplies.forEach(s=>{if(cs[c].stock[s.id]===undefined)cs[c].stock[s.id]=0;});
+    });
+    updateCenterStats();
+    if(currentTab==="inventario") renderInventario();
+    if(currentTab==="gestion") renderGestion();
+  });
+
+  _unsubGN = _db.collection(DB_COL).doc("center_GN").onSnapshot(snap=>{
+    if(snap.exists){ cs.GN=snap.data(); if(!cs.GN.stock)cs.GN.stock={}; if(!cs.GN.movements)cs.GN.movements=[]; }
+    updateCenterStats();
+    if(activeCenter==="GN") renderCurrentTab();
+  });
+
+  _unsubSarm = _db.collection(DB_COL).doc("center_Sarmiento").onSnapshot(snap=>{
+    if(snap.exists){ cs.Sarmiento=snap.data(); if(!cs.Sarmiento.stock)cs.Sarmiento.stock={}; if(!cs.Sarmiento.movements)cs.Sarmiento.movements=[]; }
+    updateCenterStats();
+    if(activeCenter==="Sarmiento") renderCurrentTab();
+  });
+
+  if(isAdmin) startUsersListener();
+}
+
+function startUsersListener(){
+  _unsubUsers = _db.collection(DB_USERS).onSnapshot(snap=>{
+    const users=[];
+    snap.forEach(doc=>users.push(doc.data()));
+    renderAdminUsers(users);
+  });
+}
+
+// ─── Admin user management ────────────────────────────────────────────────────
+function renderAdminUsers(users){
+  const el=document.getElementById("adminUserList");
+  if(!el)return;
+  if(!users.length){el.innerHTML='<p style="font-size:13px;color:var(--text-secondary)">No hay usuarios autorizados aún.</p>';return;}
+  el.innerHTML=users.map(u=>`
+    <div class="admin-user-row">
+      <span class="admin-user-email">${escHtml(u.email)}</span>
+      <span class="admin-user-role">${escHtml(u.name||"Usuario")}</span>
+      <button class="btn-remove-user" onclick="removeUser('${escAttr(u.email)}')">Quitar</button>
+    </div>
+  `).join("");
+}
+
+async function addAuthorizedUser(){
+  const email=(document.getElementById("adminNewEmail").value||"").trim().toLowerCase();
+  if(!email||!email.includes("@")){toast("⚠️ Ingresá un email válido");return;}
+  try{
+    await _db.collection(DB_USERS).doc(email).set({email,name:email,addedAt:new Date().toISOString(),addedBy:currentUser.email});
+    document.getElementById("adminNewEmail").value="";
+    toast("✓ Usuario agregado: "+email);
+  }catch(e){toast("⚠️ Error: "+e.message);}
+}
+
+async function removeUser(email){
+  openConfirm("Quitar usuario","¿Quitar acceso a "+email+"?",async()=>{
+    try{
+      await _db.collection(DB_USERS).doc(email).delete();
+      toast("✓ Acceso revocado: "+email);
+    }catch(e){toast("⚠️ Error: "+e.message);}
+  });
+}
+
 // ─── Init ────────────────────────────────────────────────────────────────────
-(function(){
-  const today=new Date().toISOString().slice(0,10);
-  const d30=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
-  const fe=document.getElementById("movDateFrom"),te=document.getElementById("movDateTo");
-  if(fe)fe.value=d30; if(te)te.value=today;
-  updateCenterStats();
-  renderInventario();
-})();
+const today=new Date().toISOString().slice(0,10);
+const d30=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+const fe=document.getElementById("movDateFrom"),te=document.getElementById("movDateTo");
+if(fe)fe.value=d30; if(te)te.value=today;
+
+showLogin(false); // show login screen while firebase loads
+
+_auth.onAuthStateChanged(async user=>{
+  if(!user){ showLogin(false); currentUser=null; isAdmin=false; return; }
+  const email=user.email.toLowerCase();
+  currentUser=user;
+  if(email===ADMIN_EMAIL){ isAdmin=true; showApp(); startListeners(); return; }
+  try{
+    const doc=await _db.collection(DB_USERS).doc(email).get();
+    if(doc.exists){ isAdmin=false; showApp(); startListeners(); }
+    else{ showLogin(true); }
+  }catch(e){ toast("⚠️ Error verificando acceso"); showLogin(false); }
+});
 </script>
 </body>
 </html>
