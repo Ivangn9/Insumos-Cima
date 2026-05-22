@@ -1,5 +1,5 @@
 {
-  "version": "1.0.20",
-  "date": "2026-05-20",
-  "changelog": "Fix Android: boton menos de UND ya no queda cortado en pantallas pequeñas"
+  "version": "1.0.21",
+  "date": "2026-05-22",
+  "changelog": "Elimina boton Exportar PDF del header"
 }
