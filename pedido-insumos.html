@@ -11,6 +11,9 @@
   <title>Pedido de Insumos · CIMA</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <style>
     /* ─── Reset & Base ─────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -168,6 +171,9 @@
       color: #1a8f3c;
     }
     .btn-share:hover { background: rgba(48,209,88,0.20); }
+    .btn-enviar { background: linear-gradient(135deg,#0071e3,#0058b0); color: #fff; border: none; }
+    .btn-enviar:hover { box-shadow: 0 6px 20px rgba(0,113,227,.45); }
+    .btn-enviar:disabled { opacity: .6; pointer-events: none; }
 
     .btn-icon { font-size: 16px; line-height: 1; }
 
@@ -699,6 +705,9 @@
       </button>
       <button class="btn btn-primary" onclick="exportPDF()">
         <span class="btn-icon">⬇</span> Exportar PDF
+      </button>
+      <button class="btn btn-enviar" id="btnEnviar" onclick="enviarPedido()">
+        <span class="btn-icon">&#10148;</span> Enviar Pedido
       </button>
     </div>
   </header>
@@ -1847,6 +1856,60 @@ function _iosFallback(doc, fname) {
   // dataurlnewwindow usa un form POST para bypassear el bloqueador de popups
   doc.output("dataurlnewwindow", { filename: fname });
   toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
+}
+
+// ─── Firebase / Solicitudes ───────────────────────────────────────────────────
+(function initFirebasePedido(){
+  const cfg = {
+    apiKey: "AIzaSyDpzlN1gaJUH6XGAWv5GRW_suk7zcqKeJE",
+    authDomain: "medtrack-cima-3e9c1.firebaseapp.com",
+    projectId: "medtrack-cima-3e9c1",
+    storageBucket: "medtrack-cima-3e9c1.firebasestorage.app",
+    messagingSenderId: "110780335014",
+    appId: "1:110780335014:web:b991d26e01637bdc884567"
+  };
+  if(!firebase.apps.length) firebase.initializeApp(cfg);
+  window._pedidoDB = firebase.firestore();
+  firebase.auth().signInAnonymously().catch(()=>{});
+})();
+
+async function enviarPedido(){
+  const solicitante=(document.getElementById("solicitante").value||"").trim();
+  const fecha=document.getElementById("fecha").value||"";
+  if(!solicitante){toast("⚠️ Ingresá tu nombre antes de enviar");return;}
+  if(!fecha){toast("⚠️ Seleccioná la fecha");return;}
+  const hasItems=Object.values(qty).some(v=>v.cantidad>0||v.caja>0||v.pack>0)||customItems.some(ci=>(ci.cantidad||0)>0);
+  if(!hasItems){toast("⚠️ Agregá al menos un insumo al pedido");return;}
+  const btn=document.getElementById("btnEnviar");
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="btn-icon">⏳</span> Enviando...';}
+  try{
+    let result;
+    try{result=_buildPDF();}catch(e){toast("⚠️ Error al generar PDF");if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}return;}
+    const pdfBase64=result.doc.output("datauristring");
+    if(!firebase.auth().currentUser){await firebase.auth().signInAnonymously();}
+    let totalItems=0;
+    Object.values(qty).forEach(v=>{if(v.cantidad>0||v.caja>0||v.pack>0)totalItems++;});
+    customItems.forEach(ci=>{if((ci.cantidad||0)>0)totalItems++;});
+    await window._pedidoDB.collection("solicitudes").add({
+      timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+      fecha,
+      solicitante,
+      sector:document.getElementById("sector").value||"",
+      prioridad:document.getElementById("prioridad").value||"Normal",
+      equipo:document.getElementById("equipo").value||"",
+      observaciones:(document.getElementById("observaciones").value||"").trim(),
+      pdfBase64,
+      pdfNombre:result.fname||("pedido-"+fecha+".pdf"),
+      totalItems,
+      leido:false
+    });
+    toast("✓ Pedido enviado correctamente");
+  }catch(e){
+    toast("⚠️ Error al enviar: "+(e.message||"").slice(0,60));
+    console.error(e);
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}
+  }
 }
 </script>
 </body>
