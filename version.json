@@ -1,5 +1,5 @@
 {
   "version": "1.0.22",
   "date": "2026-05-22",
-  "changelog": "Fix version mismatch; integracion con Stock de Insumos, boton Enviar Pedido"
+  "changelog": "Fix version mismatch; integracion con Stock de Insumos, boton Enviar Pedido; zoom fijo"
 }
