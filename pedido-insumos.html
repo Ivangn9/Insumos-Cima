@@ -43,7 +43,12 @@
       --bg-to:   #d4ecf7;
     }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      touch-action: pan-x pan-y;
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
@@ -53,6 +58,7 @@
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      touch-action: pan-x pan-y;
     }
 
     /* ─── Ambient background ───────────────────────── */
@@ -811,8 +817,29 @@
 </div>
 
 <script>
+// ─── Lock zoom (iOS Safari ignora user-scalable=no por accesibilidad) ────────
+(function() {
+  document.addEventListener("gesturestart",  function(e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturechange", function(e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gestureend",    function(e) { e.preventDefault(); }, { passive: false });
+  var _lastTouchEnd = 0;
+  document.addEventListener("touchend", function(e) {
+    var now = Date.now();
+    if (now - _lastTouchEnd <= 320) e.preventDefault();
+    _lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener("wheel", function(e) {
+    if (e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("keydown", function(e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")) {
+      e.preventDefault();
+    }
+  });
+})();
+
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.22";
+const CURRENT_VERSION = "1.0.23";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
