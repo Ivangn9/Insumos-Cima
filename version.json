@@ -1,5 +1,5 @@
 {
-  "version": "1.0.21",
+  "version": "1.0.22",
   "date": "2026-05-22",
-  "changelog": "Elimina boton Exportar PDF del header"
+  "changelog": "Fix version mismatch; integracion con Stock de Insumos, boton Enviar Pedido"
 }
