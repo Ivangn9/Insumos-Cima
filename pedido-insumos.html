@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="CIMA Insumos" />
@@ -1434,12 +1434,12 @@ function confirmClear() {
 }
 
 // ─── Toast ──────────────────────────────────────────────────────────────────
-function toast(msg) {
+function toast(msg, duration) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  toast._t = setTimeout(() => el.classList.remove("show"), duration || 3200);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1856,6 +1856,9 @@ function _iosFallback(doc, fname) {
 }
 
 // ─── Firebase / Solicitudes ───────────────────────────────────────────────────
+let _firebaseAuthReady = false;
+let _firebaseAuthError = null;
+
 (function initFirebasePedido(){
   const cfg = {
     apiKey: "AIzaSyDpzlN1gaJUH6XGAWv5GRW_suk7zcqKeJE",
@@ -1868,16 +1871,34 @@ function _iosFallback(doc, fname) {
   try{
     if(!firebase.apps.length) firebase.initializeApp(cfg);
     window._pedidoDB = firebase.firestore();
-    // Wait for auth state — use existing Google session if available, else anon
     firebase.auth().onAuthStateChanged(user=>{
-      if(!user) firebase.auth().signInAnonymously().catch(e=>console.warn("anon auth:",e));
+      if(user){
+        _firebaseAuthReady = true;
+        _firebaseAuthError = null;
+        console.log("Firebase auth OK:", user.isAnonymous ? "anónimo" : user.email);
+      } else {
+        firebase.auth().signInAnonymously()
+          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; })
+          .catch(e=>{
+            _firebaseAuthError = e.code||e.message;
+            console.warn("Firebase anon auth falló:", e.code, e.message);
+          });
+      }
     });
   }catch(e){console.error("Firebase init:",e);}
 })();
 
 async function _ensurePedidoAuth(){
-  if(firebase.auth().currentUser) return;
-  await firebase.auth().signInAnonymously();
+  const user = firebase.auth().currentUser;
+  if(user) return;
+  try {
+    await firebase.auth().signInAnonymously();
+  } catch(e) {
+    if(e.code === 'auth/operation-not-allowed'){
+      throw new Error('AUTH_DISABLED: El inicio de sesión anónimo no está habilitado. Activalo en Firebase Console → Authentication → Sign-in method → Anonymous.');
+    }
+    throw e;
+  }
 }
 
 async function enviarPedido(){
@@ -1887,10 +1908,10 @@ async function enviarPedido(){
   if(!fecha){toast("⚠️ Seleccioná la fecha");return;}
   const hasItems=Object.values(qty).some(v=>v.cantidad>0||v.caja>0||v.pack>0)||customItems.some(ci=>(ci.cantidad||0)>0);
   if(!hasItems){toast("⚠️ Agregá al menos un insumo al pedido");return;}
+  if(!window._pedidoDB){toast("⚠️ Firebase no disponible · Recargá la página");return;}
   const btn=document.getElementById("btnEnviar");
   if(btn){btn.disabled=true;btn.innerHTML='<span class="btn-icon">⏳</span> Enviando...';}
   try{
-    // Collect items (not PDF — too large for Firestore)
     const items=[];
     Object.entries(SUPPLIES).forEach(([catName,cat])=>{
       cat.items.filter(item=>hasQty(item.id)).forEach(item=>{
@@ -1904,25 +1925,38 @@ async function enviarPedido(){
       items.push({id:item.id,name:item.name,cat:"Adicionales",
         cantidad:q.cantidad||0,caja:q.caja||0,pack:q.pack||0,custom:true});
     });
-    // Ensure authenticated
-    await _ensurePedidoAuth();
-    // Write to insumos_cima/solicitudes_log/items (same collection, existing rules apply)
+    // Authenticate (Google session if available, else anonymous)
+    try{ await _ensurePedidoAuth(); }
+    catch(authErr){
+      console.warn("Auth no disponible, intentando escribir de todas formas:", authErr.message);
+    }
+    const payload = {
+      timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+      fecha,solicitante,
+      sector:document.getElementById("sector").value||"",
+      prioridad:document.getElementById("prioridad").value||"Normal",
+      equipo:document.getElementById("equipo").value||"",
+      observaciones:(document.getElementById("observaciones").value||"").trim(),
+      items,
+      totalItems:items.length,
+      leido:false
+    };
+    console.log("Enviando pedido a Firestore...", {user: firebase.auth().currentUser?.uid||"sin auth", items:items.length});
     await window._pedidoDB
-      .collection("insumos_cima").doc("solicitudes_log").collection("items").add({
-        timestamp:firebase.firestore.FieldValue.serverTimestamp(),
-        fecha,solicitante,
-        sector:document.getElementById("sector").value||"",
-        prioridad:document.getElementById("prioridad").value||"Normal",
-        equipo:document.getElementById("equipo").value||"",
-        observaciones:(document.getElementById("observaciones").value||"").trim(),
-        items,
-        totalItems:items.length,
-        leido:false
-      });
+      .collection("insumos_cima").doc("solicitudes_log").collection("items").add(payload);
+    console.log("Pedido enviado OK");
     toast("✓ Pedido enviado correctamente");
   }catch(e){
-    console.error("enviarPedido error:",e);
-    toast("⚠️ Error al enviar: "+(e.message||String(e)).slice(0,80));
+    console.error("enviarPedido error:", e.code, e.message, e);
+    let msg = e.message||String(e);
+    if(e.code==="permission-denied"||msg.includes("PERMISSION_DENIED")){
+      msg = "Sin permiso para escribir. Habilitá 'Anónimo' en Firebase Console → Authentication.";
+    } else if(msg.includes("AUTH_DISABLED")){
+      msg = "Activá 'Anonymous' en Firebase Console → Authentication → Sign-in method.";
+    } else if(e.code==="unavailable"){
+      msg = "Sin conexión a internet. Revisá tu red e intentá de nuevo.";
+    }
+    toast("⚠️ " + msg.slice(0, 120), 6000);
   }finally{
     if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}
   }
