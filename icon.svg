@@ -1,39 +1,158 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#5AC8FA"/>
-      <stop offset="50%"  stop-color="#007AFF"/>
-      <stop offset="100%" stop-color="#0040DD"/>
+    <!-- Brushed metal background -->
+    <linearGradient id="metalBg" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%"   stop-color="#e2e2e2"/>
+      <stop offset="30%"  stop-color="#cacaca"/>
+      <stop offset="55%"  stop-color="#b8b8b8"/>
+      <stop offset="80%"  stop-color="#c8c8c8"/>
+      <stop offset="100%" stop-color="#b0b0b0"/>
     </linearGradient>
-    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+
+    <!-- Radial depth / top-left shine -->
+    <radialGradient id="depthOverlay" cx="38%" cy="30%" r="65%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.22"/>
+    </radialGradient>
+
+    <!-- Inner circle (steel-gray) -->
+    <radialGradient id="innerGrad" cx="38%" cy="32%" r="68%">
+      <stop offset="0%"   stop-color="#b0b8c4"/>
+      <stop offset="45%"  stop-color="#848e9c"/>
+      <stop offset="100%" stop-color="#5a6472"/>
+    </radialGradient>
+
+    <!-- Inner circle ring highlight overlay -->
+    <radialGradient id="innerRingShine" cx="50%" cy="50%" r="50%">
       <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="42%"  stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="50%"  stop-color="#000000" stop-opacity="0.10"/>
+      <stop offset="58%"  stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="82%"  stop-color="#000000" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.20"/>
+    </radialGradient>
+
+    <!-- Red cross gradient -->
+    <linearGradient id="crossGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#e03030"/>
+      <stop offset="100%" stop-color="#aa1a1a"/>
     </linearGradient>
-    <clipPath id="shape">
-      <rect width="1024" height="1024" rx="224" ry="224"/>
+
+    <clipPath id="roundClip">
+      <rect width="1024" height="1024" rx="210" ry="210"/>
     </clipPath>
   </defs>
 
-  <!-- Background -->
-  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <!-- ── Background: brushed metal rounded square ── -->
+  <rect width="1024" height="1024" rx="210" ry="210" fill="url(#metalBg)"/>
+  <rect width="1024" height="1024" rx="210" ry="210" fill="url(#depthOverlay)"/>
 
-  <!-- Top shine -->
-  <rect width="1024" height="560" rx="224" ry="224" fill="url(#shine)" clip-path="url(#shape)"/>
+  <!-- Subtle inner border shadow -->
+  <rect x="3" y="3" width="1018" height="1018" rx="208" ry="208"
+        fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="3"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="209" ry="209"
+        fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="2"/>
 
-  <!-- Medical kit box body -->
-  <rect x="192" y="340" width="640" height="440" rx="72" ry="72" fill="white" opacity="0.95"/>
+  <!-- ══════════════════════════════════════════
+       OUTER SEGMENTED RING  (cx=512, cy=425)
+       Outer R=390  Inner r=320
+       8 segments × 30°, gaps of 15°
+  ══════════════════════════════════════════ -->
 
-  <!-- Kit handle -->
-  <rect x="352" y="256" width="320" height="140" rx="48" ry="48" fill="white" opacity="0.95"/>
-  <rect x="392" y="280" width="240" height="92" rx="34" ry="34" fill="url(#bg)"/>
+  <!-- S1: -112° → -82°  (≈10–11 o'clock)  DARK BLUE -->
+  <path d="M 366,68 A 390,390 0 0,1 566,44 L 557,113 A 320,320 0 0,0 392,133 Z"
+        fill="#2A4A87"/>
 
-  <!-- Red cross on kit -->
-  <rect x="462" y="390" width="100" height="288" rx="28" ry="28" fill="#FF3B30"/>
-  <rect x="318" y="490" width="388" height="100" rx="28" ry="28" fill="#FF3B30"/>
+  <!-- S2: -67° → -37°   (≈12–1 o'clock)   DARK BLUE -->
+  <path d="M 664,71 A 390,390 0 0,1 824,195 L 768,237 A 320,320 0 0,0 637,135 Z"
+        fill="#2D4E8C"/>
 
-  <!-- Corner dots (pills) -->
-  <circle cx="168" cy="168" r="44" fill="rgba(255,255,255,0.18)"/>
-  <circle cx="856" cy="168" r="32" fill="rgba(255,255,255,0.14)"/>
-  <circle cx="168" cy="856" r="32" fill="rgba(255,255,255,0.14)"/>
-  <circle cx="856" cy="856" r="44" fill="rgba(255,255,255,0.18)"/>
+  <!-- S3: -22° → 8°     (≈2–3 o'clock)    LIGHT BLUE-GRAY -->
+  <path d="M 874,284 A 390,390 0 0,1 898,484 L 829,475 A 320,320 0 0,0 809,310 Z"
+        fill="#92AACC"/>
+
+  <!-- S4: 23° → 53°     (≈4–5 o'clock)    SILVER-GRAY -->
+  <path d="M 871,582 A 390,390 0 0,1 747,742 L 705,686 A 320,320 0 0,0 807,555 Z"
+        fill="#B8BFCC"/>
+
+  <!-- S5: 68° → 98°     (≈5–7 o'clock)    LIGHT SILVER -->
+  <path d="M 658,792 A 390,390 0 0,1 458,816 L 468,747 A 320,320 0 0,0 632,727 Z"
+        fill="#C8CDD8"/>
+
+  <!-- S6: 113° → 143°   (≈7–8 o'clock)    LIGHT GRAY -->
+  <path d="M 360,789 A 390,390 0 0,1 201,665 L 256,623 A 320,320 0 0,0 387,725 Z"
+        fill="#BCC3D0"/>
+
+  <!-- S7: 158° → 188°   (≈9–10 o'clock)   MEDIUM BLUE-GRAY -->
+  <path d="M 150,576 A 390,390 0 0,1 126,376 L 195,386 A 320,320 0 0,0 215,550 Z"
+        fill="#7A9ABB"/>
+
+  <!-- S8: 203° → 233°   (≈10 o'clock)     MEDIUM BLUE -->
+  <path d="M 153,278 A 390,390 0 0,1 277,119 L 319,174 A 320,320 0 0,0 217,305 Z"
+        fill="#4E70A8"/>
+
+  <!-- Segment highlight (thin inner arc glow) -->
+  <circle cx="512" cy="425" r="322" fill="none"
+          stroke="rgba(255,255,255,0.28)" stroke-width="3"/>
+  <circle cx="512" cy="425" r="388" fill="none"
+          stroke="rgba(0,0,0,0.14)" stroke-width="3"/>
+
+  <!-- ── Metal gap ring between segments and inner core ── -->
+  <circle cx="512" cy="425" r="295" fill="url(#metalBg)" opacity="0.80"/>
+  <circle cx="512" cy="425" r="295" fill="url(#depthOverlay)" opacity="0.5"/>
+  <circle cx="512" cy="425" r="295" fill="none"
+          stroke="rgba(255,255,255,0.30)" stroke-width="3"/>
+  <circle cx="512" cy="425" r="248" fill="none"
+          stroke="rgba(0,0,0,0.18)" stroke-width="3"/>
+
+  <!-- ── Inner steel circle (core) ── -->
+  <circle cx="512" cy="425" r="244" fill="url(#innerGrad)"/>
+  <circle cx="512" cy="425" r="244" fill="url(#innerRingShine)"/>
+
+  <!-- Concentric depth rings inside core -->
+  <circle cx="512" cy="425" r="216" fill="none"
+          stroke="rgba(255,255,255,0.14)" stroke-width="2"/>
+  <circle cx="512" cy="425" r="190" fill="none"
+          stroke="rgba(0,0,0,0.10)" stroke-width="2"/>
+  <circle cx="512" cy="425" r="168" fill="none"
+          stroke="rgba(255,255,255,0.09)" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════
+       RED MEDICAL PLUS (+)
+       Centered at 512, 425
+       Arms: w=72, total_h=190 / total_w=190, h=72
+  ══════════════════════════════════════════ -->
+  <!-- Vertical arm -->
+  <rect x="476" y="332" width="72" height="186" rx="16" ry="16"
+        fill="url(#crossGrad)"/>
+  <!-- Horizontal arm -->
+  <rect x="419" y="389" width="186" height="72" rx="16" ry="16"
+        fill="url(#crossGrad)"/>
+  <!-- Plus shine (top highlight on vertical arm) -->
+  <rect x="476" y="332" width="72" height="38" rx="16" ry="16"
+        fill="rgba(255,255,255,0.22)"/>
+  <!-- Plus shine (left highlight on horizontal arm) -->
+  <rect x="419" y="389" width="38" height="72" rx="16" ry="16"
+        fill="rgba(255,255,255,0.15)"/>
+
+  <!-- ══════════════════════════════════════════
+       TEXT: CIMA  +  insumos
+  ══════════════════════════════════════════ -->
+  <!-- Drop shadow for text -->
+  <text x="514" y="756"
+        font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="800" font-size="112" fill="rgba(0,0,0,0.18)"
+        text-anchor="middle" letter-spacing="6">CIMA</text>
+  <!-- CIMA text -->
+  <text x="512" y="753"
+        font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="800" font-size="112" fill="#28384C"
+        text-anchor="middle" letter-spacing="6">CIMA</text>
+
+  <!-- insumos text -->
+  <text x="512" y="848"
+        font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-weight="400" font-size="74" fill="#5C6E84"
+        text-anchor="middle" letter-spacing="3">insumos</text>
 </svg>

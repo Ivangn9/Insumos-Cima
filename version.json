@@ -1,5 +1,5 @@
 {
-  "version": "1.0.23",
-  "date": "2026-05-22",
-  "changelog": "Bloqueo total de zoom: pinch, double-tap, Ctrl+rueda y Ctrl+/-/0; comportamiento app nativa en iOS, Android, Windows, iPad"
+  "version": "1.0.24",
+  "date": "2026-05-26",
+  "changelog": "Nuevo icono app: anillo segmentado CIMA con cruz medica roja y texto CIMA insumos"
 }
