@@ -841,7 +841,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.24";
+const CURRENT_VERSION = "1.0.25";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1489,15 +1489,35 @@ function compareSemver(a, b) {
 // ─── Update system ───────────────────────────────────────────────────────────
 document.getElementById("versionLabel").textContent = "V" + CURRENT_VERSION;
 
+// Limpia todos los caches y fuerza fetch fresco antes de navegar
+async function applyUpdate() {
+  toast("Actualizando...");
+  // 1. Limpiar Service Worker caches
+  if ("caches" in window) {
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    } catch(e) {}
+  }
+  // 2. Forzar fetch fresco del HTML (cache: "reload" actualiza la HTTP cache)
+  //    luego navegar a esa URL nueva para que el browser sirva el contenido fresco
+  const freshUrl = location.pathname + "?v=" + Date.now();
+  try {
+    await fetch(freshUrl, { cache: "reload" });
+    location.replace(freshUrl);
+  } catch(e) {
+    // Fallback: reload forzado
+    location.reload();
+  }
+}
+
 async function checkUpdate(userTriggered = true) {
-  const btn  = document.getElementById("btnUpdate");
-  const icon = document.getElementById("updateIcon");
-  btn.classList.add("loading");
+  const btn = document.getElementById("btnUpdate");
   btn.disabled = true;
+  btn.classList.add("loading");
 
   try {
-    const url = "./version.json?t=" + Date.now();
-    const res  = await fetch(url, { cache: "no-store" });
+    const res = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("no file");
     const data = await res.json();
     const latest = data.version || CURRENT_VERSION;
@@ -1506,25 +1526,22 @@ async function checkUpdate(userTriggered = true) {
       document.getElementById("versionDot").classList.add("outdated");
       document.getElementById("newVersionLabel").textContent = "V" + latest;
       document.getElementById("updateBanner").classList.add("visible");
-      if (userTriggered) toast("Nueva versión V" + latest + " disponible ↑");
+      // Si el usuario tocó el botón → actualizar de inmediato, sin pasos extra
+      if (userTriggered) { await applyUpdate(); return; }
+      // Auto-check silencioso + sin datos cargados → actualizar solo
+      if (!hasUnsavedData()) { await applyUpdate(); return; }
+      // Tiene datos cargados → solo mostrar banner para que decida
     } else {
       document.getElementById("versionDot").classList.remove("outdated");
       document.getElementById("updateBanner").classList.remove("visible");
-      if (userTriggered) toast("Ya tenés la versión más reciente ✓");
+      if (userTriggered) toast("Ya tenés la última versión ✓");
     }
   } catch {
-    if (userTriggered) toast("No se pudo verificar actualizaciones");
+    if (userTriggered) toast("Sin conexión – no se pudo verificar");
   } finally {
-    btn.classList.remove("loading");
     btn.disabled = false;
+    btn.classList.remove("loading");
   }
-}
-
-function applyUpdate() {
-  if ("caches" in window) {
-    caches.keys().then(names => names.forEach(n => caches.delete(n)));
-  }
-  location.href = location.pathname + "?v=" + Date.now();
 }
 
 function hasUnsavedData() {
@@ -1533,30 +1550,11 @@ function hasUnsavedData() {
   return Object.values(qty).some(q => q.cantidad > 0 || q.caja > 0 || q.pack > 0);
 }
 
-let _latestVersion = null;
-
-// Auto-check on load (silent)
+// Auto-check al cargar (silencioso)
 window.addEventListener("load", () => checkUpdate(false));
 
 // Chequeo automático cada 5 minutos
-setInterval(async () => {
-  try {
-    const res  = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
-    const data = await res.json();
-    const latest = data.version || CURRENT_VERSION;
-    if (compareSemver(latest, CURRENT_VERSION) > 0) {
-      _latestVersion = latest;
-      document.getElementById("versionDot").classList.add("outdated");
-      document.getElementById("newVersionLabel").textContent = "V" + latest;
-      document.getElementById("updateBanner").classList.add("visible");
-      if (!hasUnsavedData()) {
-        // Sin datos cargados: recarga automática silenciosa
-        applyUpdate();
-      }
-      // Con datos cargados: solo muestra el banner, no recarga
-    }
-  } catch { /* sin conexión, ignorar */ }
-}, 5 * 60 * 1000);
+setInterval(() => checkUpdate(false), 5 * 60 * 1000);
 
 // ─── Export PDF ──────────────────────────────────────────────────────────────
 function exportPDF() {

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.24",
+  "version": "1.0.25",
   "date": "2026-05-26",
-  "changelog": "Nuevo icono app: anillo segmentado CIMA con cruz medica roja y texto CIMA insumos"
+  "changelog": "Boton Actualizar ahora recarga directamente sin pasos extra; applyUpdate fuerza fetch fresco para evitar cache del browser"
 }
