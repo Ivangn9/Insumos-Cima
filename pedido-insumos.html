@@ -841,7 +841,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.25";
+const CURRENT_VERSION = "1.0.26";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1489,24 +1489,42 @@ function compareSemver(a, b) {
 // ─── Update system ───────────────────────────────────────────────────────────
 document.getElementById("versionLabel").textContent = "V" + CURRENT_VERSION;
 
+// Obtiene la version.json fresca sin importar el cache CDN.
+// Estrategia: intenta GitHub API (siempre fresco) → fallback local con cache:reload
+async function _fetchLatestVersion() {
+  // 1. GitHub API — bypasa Fastly CDN de GitHub Pages, siempre devuelve el HEAD actual
+  try {
+    const apiUrl = "https://api.github.com/repos/Ivangn9/Insumos-Cima/contents/version.json";
+    const res = await fetch(apiUrl, {
+      cache: "no-store",
+      headers: { "Accept": "application/vnd.github.v3+json" }
+    });
+    if (res.ok) {
+      const meta = await res.json();
+      // El contenido viene en base64
+      const raw = atob(meta.content.replace(/\n/g, ""));
+      return JSON.parse(raw);
+    }
+  } catch(e) {}
+  // 2. Fallback: version.json local con cache:reload (fuerza red, no CDN cache)
+  const res = await fetch("./version.json", { cache: "reload" });
+  return await res.json();
+}
+
 // Limpia todos los caches y fuerza fetch fresco antes de navegar
 async function applyUpdate() {
   toast("Actualizando...");
-  // 1. Limpiar Service Worker caches
   if ("caches" in window) {
     try {
       const names = await caches.keys();
       await Promise.all(names.map(n => caches.delete(n)));
     } catch(e) {}
   }
-  // 2. Forzar fetch fresco del HTML (cache: "reload" actualiza la HTTP cache)
-  //    luego navegar a esa URL nueva para que el browser sirva el contenido fresco
   const freshUrl = location.pathname + "?v=" + Date.now();
   try {
     await fetch(freshUrl, { cache: "reload" });
     location.replace(freshUrl);
   } catch(e) {
-    // Fallback: reload forzado
     location.reload();
   }
 }
@@ -1517,9 +1535,7 @@ async function checkUpdate(userTriggered = true) {
   btn.classList.add("loading");
 
   try {
-    const res = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) throw new Error("no file");
-    const data = await res.json();
+    const data = await _fetchLatestVersion();
     const latest = data.version || CURRENT_VERSION;
 
     if (compareSemver(latest, CURRENT_VERSION) > 0) {

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.25",
+  "version": "1.0.26",
   "date": "2026-05-26",
-  "changelog": "Boton Actualizar ahora recarga directamente sin pasos extra; applyUpdate fuerza fetch fresco para evitar cache del browser"
+  "changelog": "Fix actualizacion: chequeo via GitHub API para evitar cache CDN de GitHub Pages"
 }
