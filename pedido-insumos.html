@@ -661,6 +661,18 @@
   </div>
 </div>
 
+<!-- ─── Error modal (fallo de envío) ───────────────── -->
+<div class="modal-overlay" id="errorOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title" id="errorTitle">Error al enviar</div>
+    <div class="modal-desc" id="errorDesc" style="text-align:left;line-height:1.5;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="justify-content:center;" onclick="document.getElementById('errorOverlay').classList.remove('open')">Entendido</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Custom item modal ───────────────────────────── -->
 <div class="modal-overlay" id="addManualOverlay">
   <div class="modal-box">
@@ -707,9 +719,6 @@
     <div class="header-actions">
       <button class="btn btn-ghost-red" onclick="openModal()">
         <span class="btn-icon">✕</span> Limpiar
-      </button>
-      <button class="btn btn-share" onclick="shareOrder()">
-        <span class="btn-icon">&#8679;</span> Compartir
       </button>
       <button class="btn btn-enviar" id="btnEnviar" onclick="enviarPedido()">
         <span class="btn-icon">&#10148;</span> Enviar Pedido
@@ -841,7 +850,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.26";
+const CURRENT_VERSION = "1.0.27";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1989,19 +1998,37 @@ async function enviarPedido(){
       .collection("insumos_cima").doc("solicitudes_log").collection("items").add(payload);
     console.log("Pedido enviado OK");
     toast("✓ Pedido enviado correctamente");
-  }catch(e){
+  } catch(e) {
     console.error("enviarPedido error:", e.code, e.message, e);
-    let msg = e.message||String(e);
-    if(e.code==="permission-denied"||msg.includes("PERMISSION_DENIED")){
-      msg = "Sin permiso para escribir. Habilitá 'Anónimo' en Firebase Console → Authentication.";
-    } else if(msg.includes("AUTH_DISABLED")){
-      msg = "Activá 'Anonymous' en Firebase Console → Authentication → Sign-in method.";
-    } else if(e.code==="unavailable"){
-      msg = "Sin conexión a internet. Revisá tu red e intentá de nuevo.";
+    const raw = e.message || String(e);
+    let title = "No se pudo enviar el pedido";
+    let desc  = "";
+
+    if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
+      title = "Sin permiso de escritura";
+      desc  = "Firebase rechazó el pedido por falta de permisos.\n\nSolución: activá el acceso anónimo en Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+    } else if (raw.includes("AUTH_DISABLED") || raw.includes("auth/operation-not-allowed")) {
+      title = "Autenticación no habilitada";
+      desc  = "El acceso anónimo está desactivado en Firebase.\n\nSolución: Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+    } else if (e.code === "unavailable" || raw.includes("network") || raw.includes("fetch")) {
+      title = "Sin conexión";
+      desc  = "No se pudo conectar con el servidor. Revisá tu conexión a internet y volvé a intentar.";
+    } else if (e.code === "not-found") {
+      title = "Base de datos no encontrada";
+      desc  = "No se encontró la colección en Firestore. Verificá la configuración de Firebase.";
+    } else if (e.code === "unauthenticated") {
+      title = "Sesión expirada";
+      desc  = "Tu sesión venció. Recargá la página e intentá de nuevo.";
+    } else {
+      desc = raw.slice(0, 200);
     }
-    toast("⚠️ " + msg.slice(0, 120), 6000);
-  }finally{
-    if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}
+
+    // Mostrar modal de error (no desaparece solo — el usuario tiene que cerrarlo)
+    document.getElementById("errorTitle").textContent = title;
+    document.getElementById("errorDesc").textContent  = desc;
+    document.getElementById("errorOverlay").classList.add("open");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon">&#10148;</span> Enviar Pedido'; }
   }
 }
 </script>

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.26",
+  "version": "1.0.27",
   "date": "2026-05-26",
-  "changelog": "Fix actualizacion: chequeo via GitHub API para evitar cache CDN de GitHub Pages"
+  "changelog": "Elimina boton Compartir; modal de error persistente en fallo de envio con mensajes detallados"
 }
