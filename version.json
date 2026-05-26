@@ -1,5 +1,5 @@
 {
-  "version": "1.0.28",
+  "version": "1.0.29",
   "date": "2026-05-26",
-  "changelog": "Workflow GitHub Actions para deploy confiable; mejora mecanismo de actualizacion; headers no-cache"
+  "changelog": "Fondo personalizado fijo (fondo.jpg) - compatible iOS/Android/desktop"
 }
