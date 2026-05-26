@@ -7,6 +7,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="CIMA Insumos" />
   <meta name="theme-color" content="#007AFF" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
@@ -850,7 +853,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.27";
+const CURRENT_VERSION = "1.0.28";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1523,18 +1526,25 @@ async function _fetchLatestVersion() {
 // Limpia todos los caches y fuerza fetch fresco antes de navegar
 async function applyUpdate() {
   toast("Actualizando...");
+  // 1. Borrar Service Worker caches si existen
   if ("caches" in window) {
     try {
       const names = await caches.keys();
       await Promise.all(names.map(n => caches.delete(n)));
     } catch(e) {}
   }
-  const freshUrl = location.pathname + "?v=" + Date.now();
+  // 2. Forzar descarga fresca del HTML con doble fetch (URL base + URL con timestamp)
+  const base    = location.pathname.split("?")[0];
+  const freshUrl = base + "?v=" + Date.now();
   try {
-    await fetch(freshUrl, { cache: "reload" });
+    // Fetch sin cache para refrescar la caché HTTP del navegador
+    await Promise.all([
+      fetch(base,     { cache: "reload" }).catch(() => {}),
+      fetch(freshUrl, { cache: "no-store" }).catch(() => {})
+    ]);
     location.replace(freshUrl);
   } catch(e) {
-    location.reload();
+    location.replace(base + "?v=" + Date.now());
   }
 }
 
@@ -1575,11 +1585,14 @@ function hasUnsavedData() {
   return Object.values(qty).some(q => q.cantidad > 0 || q.caja > 0 || q.pack > 0);
 }
 
-// Auto-check al cargar (silencioso)
-window.addEventListener("load", () => checkUpdate(false));
+// Auto-check al cargar (silencioso) + reintento rápido a los 15 s
+window.addEventListener("load", () => {
+  checkUpdate(false);
+  setTimeout(() => checkUpdate(false), 15000);
+});
 
-// Chequeo automático cada 5 minutos
-setInterval(() => checkUpdate(false), 5 * 60 * 1000);
+// Chequeo automático cada 3 minutos
+setInterval(() => checkUpdate(false), 3 * 60 * 1000);
 
 // ─── Export PDF ──────────────────────────────────────────────────────────────
 function exportPDF() {
