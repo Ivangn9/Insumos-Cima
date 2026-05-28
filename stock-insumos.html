@@ -1962,7 +1962,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.8";
+const APP_VERSION = "4.9";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -3297,6 +3297,9 @@ function showApp(){
   document.getElementById("loginOverlay").classList.remove("visible");
   document.getElementById("mainApp").style.display="";
   renderUserBar();
+  // Limpiar globo del ícono al abrir la app
+  if('clearAppBadge' in navigator) navigator.clearAppBadge().catch(()=>{});
+  if(navigator.serviceWorker?.controller) navigator.serviceWorker.controller.postMessage('clearBadge');
   if(isAdmin){
     document.getElementById("adminSection").style.display="block";
     const ab=document.getElementById("sbAdminBtn"); if(ab) ab.style.display="flex";
