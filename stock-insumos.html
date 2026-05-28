@@ -22,6 +22,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -1961,7 +1962,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.7";
+const APP_VERSION = "4.8";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -3471,14 +3472,76 @@ if(fe)fe.value=d30; if(te)te.value=today;
 
 showLogin(false); // show login screen while firebase loads
 
+// ─── PUSH NOTIFICATIONS (FCM) ────────────────────────────────────────────────
+const VAPID_KEY="BDKxu-KBTtzxjHBAKVfoltPu5tR9Vd-foFCDQJc8NjjwqCHGr-JvApownCoXCIaQZ_DAbJI6Z4bv7QZWtBHI9U4";
+let _messaging=null;
+
+async function initPushNotifications(){
+  if(!("serviceWorker" in navigator)||!("Notification" in window)) return;
+  try{
+    const swPath=location.pathname.replace(/\/[^/]*\//,"")+"firebase-messaging-sw.js";
+    const reg=await navigator.serviceWorker.register(swPath);
+    _messaging=firebase.messaging();
+    _messaging.onMessage(()=>{}); // foreground: ya manejado por onSnapshot
+    if(Notification.permission==="granted"){
+      await _registerFCMToken(reg);
+    } else if(Notification.permission==="default"){
+      setTimeout(()=>_showPushPrompt(reg),3500);
+    }
+  }catch(e){ console.warn("Push init error:",e); }
+}
+
+async function _registerFCMToken(swReg){
+  if(!_messaging||!currentUser) return;
+  try{
+    const reg=swReg||await navigator.serviceWorker.ready;
+    const token=await _messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    if(token){
+      await _db.collection("insumos_cima").doc("push_tokens").set(
+        {[currentUser.uid]:{token,email:currentUser.email||"",updatedAt:firebase.firestore.FieldValue.serverTimestamp()}},
+        {merge:true}
+      );
+    }
+  }catch(e){ console.warn("FCM token error:",e); }
+}
+
+function _showPushPrompt(reg){
+  if(Notification.permission!=="default") return;
+  const el=document.createElement("div");
+  el.style.cssText=`position:fixed;bottom:88px;left:50%;transform:translateX(-50%);z-index:9998;
+    background:rgba(28,28,30,.96);color:#fff;border-radius:18px;padding:16px 18px;
+    max-width:310px;width:calc(100% - 40px);
+    box-shadow:0 8px 32px rgba(0,0,0,.4);backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.10);
+    display:flex;flex-direction:column;gap:12px;
+    animation:notifDrop .38s cubic-bezier(0.34,1.56,0.64,1)`;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.5rem">🔔</span>
+      <div><div style="font-weight:700;font-size:.88rem">Activar notificaciones</div>
+      <div style="font-size:.74rem;color:rgba(255,255,255,.6);margin-top:2px">Recibí alertas de nuevos pedidos aunque la app esté cerrada</div></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="_pushNo" style="flex:1;padding:9px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:transparent;color:rgba(255,255,255,.55);font-size:.82rem;cursor:pointer">Ahora no</button>
+      <button id="_pushYes" style="flex:2;padding:9px;border-radius:10px;border:none;background:#0071e3;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer">Activar</button>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector("#_pushNo").onclick=()=>el.remove();
+  el.querySelector("#_pushYes").onclick=async()=>{
+    el.remove();
+    const perm=await Notification.requestPermission();
+    if(perm==="granted"){ await _registerFCMToken(reg); toast("✓ Notificaciones activadas"); }
+    else toast("⚠️ Permiso denegado · Activalo desde Ajustes del sistema");
+  };
+}
+
 _auth.onAuthStateChanged(async user=>{
   if(!user){ showLogin(false); currentUser=null; isAdmin=false; return; }
   const email=user.email.toLowerCase();
   currentUser=user;
-  if(email===ADMIN_EMAIL){ isAdmin=true; showApp(); startListeners(); return; }
+  if(email===ADMIN_EMAIL){ isAdmin=true; showApp(); startListeners(); initPushNotifications(); return; }
   try{
     const doc=await _db.collection(DB_USERS).doc(email).get();
-    if(doc.exists){ isAdmin=false; showApp(); startListeners(); }
+    if(doc.exists){ isAdmin=false; showApp(); startListeners(); initPushNotifications(); }
     else{ showLogin(true); }
   }catch(e){ toast("⚠️ Error verificando acceso"); showLogin(false); }
 });
