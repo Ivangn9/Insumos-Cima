@@ -1946,7 +1946,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.5";
+const APP_VERSION = "4.6";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -4064,7 +4064,7 @@ function renderVencimientos(){
 // ─── SOLICITUDES ─────────────────────────────────────────────────────────────
 function updateSolicitudesBadge(){
   const count=solicitudes.filter(s=>!s.leido).length;
-  document.querySelectorAll(".sol-badge").forEach(el=>{
+  document.querySelectorAll("#sol-badge-sb,#sol-badge-tab").forEach(el=>{
     el.textContent=count;
     el.style.display=count>0?"flex":"none";
   });
