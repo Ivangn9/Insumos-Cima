@@ -1946,7 +1946,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.4";
+const APP_VERSION = "4.5";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -4190,7 +4190,7 @@ function openSolicitudDetalle(id){
       <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.83rem">
         <span style="color:#8e8e93;font-weight:600">Solicitante</span><span style="font-weight:700">${escHtml(s.solicitante||"")}</span>
         <span style="color:#8e8e93;font-weight:600">Fecha</span><span>${escHtml(s.fecha||"")}</span>
-        <span style="color:#8e8e93;font-weight:600">Sector</span><span>${escHtml(s.sector||"")}</span>
+        <span style="color:#8e8e93;font-weight:600">Sucursal</span><span>${escHtml(s.sector||"")}</span>
         <span style="color:#8e8e93;font-weight:600">Equipo</span><span>${escHtml(s.equipo||"—")}</span>
         <span style="color:#8e8e93;font-weight:600">Prioridad</span><span style="font-weight:700;color:${prioColor}">${escHtml(s.prioridad||"Normal")}</span>
       </div>
@@ -4313,10 +4313,36 @@ function marcarTodasLeidas(){
   batch.commit().catch(e=>console.warn(e));
 }
 function markSolicitudEntregado(id){
+  const s=solicitudes.find(x=>x.id===id); if(!s) return;
+  const center=s.sector;
+  const centerData=cs[center];
+  if(centerData){
+    const dateStr=new Date().toISOString().split("T")[0];
+    const timeStr=new Date().toTimeString().slice(0,5);
+    (s.items||[]).forEach(item=>{
+      if(!item.id) return;
+      const supply=supplies.find(sup=>sup.id===item.id); if(!supply) return;
+      const qty=item.cantidad||0; if(qty<=0) return;
+      centerData.stock[item.id]=Math.max(0,(centerData.stock[item.id]||0)-qty);
+      if(centerData.lotes&&centerData.lotes[item.id]){
+        let rem=qty;
+        const lotes=centerData.lotes[item.id];
+        lotes.sort((a,b)=>a.fechaVenc.localeCompare(b.fechaVenc));
+        for(let i=0;i<lotes.length&&rem>0;i++){
+          if(lotes[i].qty<=0) continue;
+          const take=Math.min(lotes[i].qty,rem);
+          lotes[i].qty-=take; rem-=take;
+        }
+        centerData.lotes[item.id]=lotes.filter(l=>l.qty>0);
+      }
+      centerData.movements.push({id:"sol_"+Date.now()+"_"+item.id,supplyId:item.id,supplyName:supply.name,type:"salida",qty,date:dateStr,time:timeStr,note:"Pedido · "+(s.solicitante||"")+(s.equipo?" · "+s.equipo:"")});
+    });
+    persistCenter(center);
+  }
   _db.collection("insumos_cima").doc("solicitudes_log").collection("items")
     .doc(id).update({entregado:true,leido:true,fechaEntrega:firebase.firestore.FieldValue.serverTimestamp()})
     .then(()=>{
-      toast("✓ Pedido marcado como entregado");
+      toast(centerData?"✓ Pedido entregado · Stock actualizado":"✓ Pedido marcado como entregado");
       closePdfViewer();
     })
     .catch(e=>{console.warn(e);toast("⚠️ Error al actualizar");});
