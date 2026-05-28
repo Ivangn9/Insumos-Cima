@@ -1962,7 +1962,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.9";
+const APP_VERSION = "4.10";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -3300,6 +3300,10 @@ function showApp(){
   // Limpiar globo del ícono al abrir la app
   if('clearAppBadge' in navigator) navigator.clearAppBadge().catch(()=>{});
   if(navigator.serviceWorker?.controller) navigator.serviceWorker.controller.postMessage('clearBadge');
+  // Diagnóstico standalone (solo visible en consola)
+  const _standalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+  console.log('[PWA] Modo standalone:',_standalone,'| SW soporte:',('serviceWorker' in navigator),'| Notif soporte:',('Notification' in window));
+  if(!_standalone) console.warn('[PWA] La app NO está en modo standalone. Abrila desde el ícono de pantalla de inicio, no desde Safari.');
   if(isAdmin){
     document.getElementById("adminSection").style.display="block";
     const ab=document.getElementById("sbAdminBtn"); if(ab) ab.style.display="flex";
@@ -3482,7 +3486,7 @@ let _messaging=null;
 async function initPushNotifications(){
   if(!("serviceWorker" in navigator)||!("Notification" in window)) return;
   try{
-    const swPath=location.pathname.replace(/\/[^/]*\//,"")+"firebase-messaging-sw.js";
+    const swPath=new URL("firebase-messaging-sw.js",location.href).pathname;
     const reg=await navigator.serviceWorker.register(swPath);
     _messaging=firebase.messaging();
     _messaging.onMessage(()=>{}); // foreground: ya manejado por onSnapshot
