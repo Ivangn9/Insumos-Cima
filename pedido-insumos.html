@@ -862,7 +862,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.31";
+const CURRENT_VERSION = "1.0.32";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1702,9 +1702,8 @@ function _iosFallback(doc, fname) {
 
 // ─── Supplies loader (Firestore) ─────────────────────────────────────────────
 function loadSuppliesFromFirestore(){
-  window._pedidoDB.collection("insumos_cima").doc("supplies").onSnapshot(snap=>{
-    if(!snap.exists) return;
-    const data=(snap.data().data||[]).filter(s=>s.active!==false);
+  const CACHE_KEY="pedido_supplies_cache";
+  function applySupplies(data){
     const newSupplies={};
     data.forEach(s=>{
       const cat=s.category||"Otros";
@@ -1716,6 +1715,18 @@ function loadSuppliesFromFirestore(){
     SUPPLIES=newSupplies;
     renderAll(document.getElementById("searchInput")?.value||"");
     refreshStats();
+  }
+  // Render cached version instantly if available
+  try{
+    const cached=localStorage.getItem(CACHE_KEY);
+    if(cached) applySupplies(JSON.parse(cached));
+  }catch(e){}
+  // Then sync from Firestore in background
+  window._pedidoDB.collection("insumos_cima").doc("supplies").onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const data=(snap.data().data||[]).filter(s=>s.active!==false);
+    try{ localStorage.setItem(CACHE_KEY,JSON.stringify(data)); }catch(e){}
+    applySupplies(data);
   },e=>console.warn("Supplies load error:",e));
 }
 
