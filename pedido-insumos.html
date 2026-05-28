@@ -2,12 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="CIMA Insumos" />
   <meta name="theme-color" content="#007AFF" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <title>Pedido de Insumos · CIMA</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -43,43 +48,55 @@
       --bg-to:   #d4ecf7;
     }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      touch-action: pan-x pan-y;
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
       min-height: 100dvh;
-      background: linear-gradient(160deg, var(--bg-from) 0%, var(--bg-mid) 45%, var(--bg-to) 100%);
-      background-attachment: fixed;
+      background: transparent;
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      touch-action: pan-x pan-y;
     }
 
-    /* ─── Ambient background ───────────────────────── */
+    /* ─── Fondo fijo (imagen) ──────────────────────── */
+    /* Técnica con div separado: funciona en iOS Safari  */
+    /* donde background-attachment:fixed no funciona     */
+    .app-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image: url("fondo.jpg");
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+    }
+    /* Overlay semitransparente para mantener legibilidad */
+    .app-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(210, 230, 248, 0.52);
+    }
+
+    /* ─── Ambient glow (encima del fondo) ─────────── */
     body::before {
       content: "";
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
       background:
-        radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,122,255,0.10) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 45% at 85% 85%, rgba(48,209,88,0.07) 0%, transparent 60%),
-        radial-gradient(ellipse 80% 60% at 50% 55%, rgba(255,255,255,0.28) 0%, transparent 70%),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M30 5v50M5 30h50' stroke='rgba(0,100,200,0.03)' stroke-width='1'/%3E%3C/svg%3E");
-    }
-
-    /* ─── Floating cross icons ─────────────────────── */
-    body::after {
-      content: "";
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='32' height='32'%3E%3Crect x='9' y='2' width='6' height='20' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3Crect x='2' y='9' width='20' height='6' rx='2' fill='rgba(0,122,255,0.04)'/%3E%3C/svg%3E");
-      background-size: 120px 120px;
-      background-position: 20px 20px;
-      opacity: 0.7;
+        radial-gradient(ellipse 70% 50% at 10% 8%,  rgba(0,122,255,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 45% at 90% 88%, rgba(48,209,88,0.04) 0%, transparent 55%);
     }
 
     /* ─── Layout ───────────────────────────────────── */
     .page {
-      position: relative; z-index: 1;
+      position: relative; z-index: 2;
       max-width: 860px;
       margin: 0 auto;
       padding: 20px 16px env(safe-area-inset-bottom, 20px);
@@ -653,6 +670,18 @@
   </div>
 </div>
 
+<!-- ─── Error modal (fallo de envío) ───────────────── -->
+<div class="modal-overlay" id="errorOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title" id="errorTitle">Error al enviar</div>
+    <div class="modal-desc" id="errorDesc" style="text-align:left;line-height:1.5;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="justify-content:center;" onclick="document.getElementById('errorOverlay').classList.remove('open')">Entendido</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Custom item modal ───────────────────────────── -->
 <div class="modal-overlay" id="addManualOverlay">
   <div class="modal-box">
@@ -681,6 +710,9 @@
   </button>
 </div>
 
+<!-- ─── Fondo fijo (fixed, detrás de todo) ───────────── -->
+<div class="app-bg" aria-hidden="true"></div>
+
 <!-- ─── Toast ───────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
@@ -699,9 +731,6 @@
     <div class="header-actions">
       <button class="btn btn-ghost-red" onclick="openModal()">
         <span class="btn-icon">✕</span> Limpiar
-      </button>
-      <button class="btn btn-share" onclick="shareOrder()">
-        <span class="btn-icon">&#8679;</span> Compartir
       </button>
       <button class="btn btn-enviar" id="btnEnviar" onclick="enviarPedido()">
         <span class="btn-icon">&#10148;</span> Enviar Pedido
@@ -735,9 +764,8 @@
         <label>Centro</label>
         <select id="sector">
           <option value="">— Seleccionar —</option>
-          <option value="GN">GN</option>
-          <option value="Pedernera">Pedernera</option>
-          <option value="CRS">CRS</option>
+          <option value="GN">GN · Guardia Nacional</option>
+          <option value="Sarmiento">Sarmiento</option>
         </select>
       </div>
       <div class="form-group">
@@ -758,6 +786,7 @@
           <option value="RX">RX</option>
           <option value="DMO">DMO</option>
           <option value="ORTOPANTOMOGRAFIA">Ortopantomografía</option>
+          <option value="SALA DE RECUPERACION">Sala de Recuperación</option>
         </select>
       </div>
       <div class="form-group full">
@@ -811,8 +840,29 @@
 </div>
 
 <script>
+// ─── Lock zoom (iOS Safari ignora user-scalable=no por accesibilidad) ────────
+(function() {
+  document.addEventListener("gesturestart",  function(e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturechange", function(e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gestureend",    function(e) { e.preventDefault(); }, { passive: false });
+  var _lastTouchEnd = 0;
+  document.addEventListener("touchend", function(e) {
+    var now = Date.now();
+    if (now - _lastTouchEnd <= 320) e.preventDefault();
+    _lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener("wheel", function(e) {
+    if (e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("keydown", function(e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")) {
+      e.preventDefault();
+    }
+  });
+})();
+
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.22";
+const CURRENT_VERSION = "1.0.31";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -833,252 +883,19 @@ let _pdfLogoDims = null;
 })();
 
 // ─── Data ───────────────────────────────────────────────────────────────────
-const SUPPLIES = {
-  "Descartables": {
-    icon: "💉", color: "rgba(0,122,255,0.12)",
-    items: [
-      { id: "des001", name: "Abbocath 14G",                                        code: "DES-001" },
-      { id: "des002", name: "Abbocath 16G",                                        code: "DES-002" },
-      { id: "des003", name: "Abbocath JELCO 18G",                                  code: "DES-003" },
-      { id: "des004", name: "Abbocath JELCO 20G",                                  code: "DES-004" },
-      { id: "des005", name: "Abbocath JELCO 22G",                                  code: "DES-005" },
-      { id: "des006", name: "Abbocath JELCO 24G",                                  code: "DES-006" },
-      { id: "des007", name: "Aguja Huber 19/20G",                                  code: "DES-007" },
-      { id: "des008", name: 'Aguja hipodérmica 18G – 40/12 (1½")',                 code: "DES-008" },
-      { id: "des009", name: 'Aguja hipodérmica 21G – 40/8 (1½")',                  code: "DES-009" },
-      { id: "des010", name: 'Aguja hipodérmica 21G – 50/8 (2")',                   code: "DES-010" },
-      { id: "des011", name: 'Aguja hipodérmica 21G – 25/8 (1")',                   code: "DES-011" },
-      { id: "des012", name: 'Aguja hipodérmica 30G – 13/4 (1")',                   code: "DES-012" },
-      { id: "des013", name: 'Aguja hipodérmica 30G – 13/3 (1")',                   code: "DES-013" },
-      { id: "des014", name: "Aguja hipodérmica 25G – 16/5",                        code: "DES-014" },
-      { id: "des015", name: "Jeringa Tuberculina con aguja ×1ml",                  code: "DES-015" },
-      { id: "des016", name: "Jeringas hipodérmicas ×5ml",                          code: "DES-016" },
-      { id: "des017", name: "Jeringas desechables ×10ml",                          code: "DES-017" },
-      { id: "des018", name: "Jeringas desechables ×20ml",                          code: "DES-018" },
-      { id: "des019", name: "Jeringas hipodérmicas ×60ml",                         code: "DES-019" },
-      { id: "des020", name: "Jeringas Tomey sin aguja ×60ml",                      code: "DES-020" },
-      { id: "des021", name: "Jeringas Pico a rosca 5ml",                           code: "DES-021" },
-      { id: "des022", name: "Jeringas Pico a rosca 10ml",                          code: "DES-022" },
-      { id: "des023", name: "Butterfly 19",                                         code: "DES-023" },
-      { id: "des024", name: "Butterfly 21",                                         code: "DES-024" },
-      { id: "des025", name: "Butterfly 23",                                         code: "DES-025" },
-      { id: "des026", name: "Butterfly 25",                                         code: "DES-026" },
-      { id: "des027", name: 'Guantes látex talle "S"',                              code: "DES-027" },
-      { id: "des028", name: 'Guantes látex talle "M"',                              code: "DES-028" },
-      { id: "des029", name: 'Guantes Nitrilo "M"',                                  code: "DES-029" },
-      { id: "des030", name: 'Guantes Nitrilo "S"',                                  code: "DES-030" },
-      { id: "des031", name: "Goma para ligar",                                      code: "DES-031" },
-      { id: "des032", name: "Envase estéril descartable",                           code: "DES-032" },
-      { id: "des033", name: "Protectores Auditivos descartables",                   code: "DES-033" },
-      { id: "des034", name: "Alcohol líquido ×Lt",                                  code: "DES-034" },
-      { id: "des035", name: "Alcohol líquido bidón ×5L al 70%",                    code: "DES-035" },
-      { id: "des036", name: "Spray Sanitizante Clorhexidina (×120ml)",              code: "DES-036" },
-      { id: "des037", name: "Iodopovidona ×100ml",                                  code: "DES-037" },
-      { id: "des038", name: "Iodopovidona ×5Lt",                                    code: "DES-038" },
-      { id: "des039", name: "Iodopovidona en Spray (Pervinox)",                     code: "DES-039" },
-      { id: "des040", name: "Agua oxigenada ×1Lt",                                  code: "DES-040" },
-      { id: "des041", name: "Algodón (Pack)",                                       code: "DES-041" },
-      { id: "des042", name: "Fundas ecográficas / Preservativos (×144u)",           code: "DES-042" },
-      { id: "des043", name: "Cotonetes (×200un)",                                   code: "DES-043" },
-      { id: "des044", name: "Pañales descartables (XXL)",                           code: "DES-044" },
-      { id: "des045", name: "Apósitos hipoalergénicos (×250un)",                    code: "DES-045" },
-      { id: "des046", name: "Apósitos estériles (7×20cm)",                          code: "DES-046" },
-      { id: "des047", name: "Apósitos protectores / Curitas (×10un)",               code: "DES-047" },
-      { id: "des048", name: "Apósito Transparente con marco (10×12)",               code: "DES-048" },
-      { id: "des049", name: "Gasa estéril (10×10 ×100)",                            code: "DES-049" },
-      { id: "des050", name: "Venda Elástica (10×3Mts)",                             code: "DES-050" },
-      { id: "des051", name: "Cinta hipoalergénica Micropore 3M",                    code: "DES-051" },
-      { id: "des052", name: "Cinta hipoalergénica Transpore 3M",                    code: "DES-052" },
-      { id: "des053", name: "Gel ×3Lt",                                             code: "DES-053" },
-      { id: "des054", name: "Gel ×3Lt + Dosificador",                               code: "DES-054" },
-      { id: "des055", name: "Gel ×500ml",                                           code: "DES-055" },
-      { id: "des056", name: "Gel ×250ml",                                           code: "DES-056" },
-      { id: "des057", name: "Barbijos (Pack ×50)",                                  code: "DES-057" },
-      { id: "des058", name: "Barbijos NK95",                                        code: "DES-058" },
-      { id: "des059", name: "Batas largas con puño",                                code: "DES-059" },
-      { id: "des060", name: "Batas cortas sin mangas (AZUL RESO 2)",                code: "DES-060" },
-      { id: "des061", name: "Batas cortas sin mangas",                              code: "DES-061" },
-      { id: "des062", name: "Media Sábana (0,66×1,55mts)",                          code: "DES-062" },
-      { id: "des063", name: "Sábanas para camillas con elástico",                   code: "DES-063" },
-      { id: "des064", name: "Llaves 3 vías (MCM)",                                  code: "DES-064" },
-      { id: "des065", name: "Llaves 3 vías y set extensión 50cm",                   code: "DES-065" },
-      { id: "des066", name: "Prolongador bifurcado 2 Vías PB-1000",                 code: "DES-066" },
-      { id: "des067", name: "Set de infusión, equipo V14",                          code: "DES-067" },
-      { id: "des068", name: "Sonda Tipo K-33 (Seriografo)",                         code: "DES-068" },
-      { id: "des069", name: "Sonda Nelaton K-92 N°8 (Seriografo)",                  code: "DES-069" },
-      { id: "des070", name: "Sonda Foley N°16 FR",                                  code: "DES-070" },
-      { id: "des071", name: "Sonda Foley N°20 FR",                                  code: "DES-071" },
-      { id: "des072", name: "Sonda gástrica N°5 FR",                                code: "DES-072" },
-      { id: "des073", name: "Sonda gástrica N°16 (Tipo K10)",                       code: "DES-073" },
-      { id: "des074", name: "Sonda succión PVC N°16 (K32P c/ regulador)",           code: "DES-074" },
-      { id: "des075", name: "Sonda nasogástrica para alimentación (prematuros)",    code: "DES-075" },
-      { id: "des076", name: "Sonda nasogástrica para alimentación (adultos)",       code: "DES-076" },
-      { id: "des077", name: "Cánula nasal adulto (Tipo K-27)",                      code: "DES-077" },
-      { id: "des078", name: "Inhalador O₂ pediátrico (Tipo K-27) 2m",              code: "DES-078" },
-      { id: "des079", name: "Catéter histerosona 5FR×40cm",                         code: "DES-079" },
-      { id: "des080", name: "Catéter histerosona 7FR×40",                           code: "DES-080" },
-      { id: "des081", name: "Cateter Trocar Torácico 18 FG",                        code: "DES-081" },
-      { id: "des082", name: "Electrodos RMI punta de Carbón (×50)",                 code: "DES-082" },
-      { id: "des083", name: "Electrodos cardíacos 3M (×50)",                        code: "DES-083" },
-      { id: "des084", name: "Pasta conductora EEG",                                 code: "DES-084" },
-      { id: "des085", name: "Pasta conductora TEN20",                               code: "DES-085" },
-      { id: "des086", name: "Parche Ocular",                                        code: "DES-086" },
-    ]
-  },
-  "Ginecología": {
-    icon: "🩺", color: "rgba(255,45,85,0.10)",
-    items: [
-      { id: "gin001", name: "Pinzas MAIER",                  code: "GIN-001" },
-      { id: "gin002", name: "Espátula de madera de AYRE",    code: "GIN-002" },
-      { id: "gin003", name: "Espéculo Vaginal Grande",        code: "GIN-003" },
-      { id: "gin004", name: "Espéculo Vaginal Mediano",       code: "GIN-004" },
-      { id: "gin005", name: "Espéculo Vaginal Chico",         code: "GIN-005" },
-      { id: "gin006", name: "Cepillo Endovaginal",            code: "GIN-006" },
-      { id: "gin007", name: "Tijera Quirúrgica",              code: "GIN-007" },
-      { id: "gin008", name: "Kit Gineco Armado – Chico",      code: "GIN-008" },
-      { id: "gin009", name: "Kit Gineco Armado – Mediano",    code: "GIN-009" },
-      { id: "gin010", name: "Kit Gineco Armado – Grande",     code: "GIN-010" },
-    ]
-  },
-  "Punción": {
-    icon: "🔬", color: "rgba(191,90,242,0.10)",
-    items: [
-      { id: "pun001", name: "Campos quirúrgicos estériles (50×50)",              code: "PUN-001" },
-      { id: "pun002", name: 'Agujas espinales 20G (3½")',                        code: "PUN-002" },
-      { id: "pun003", name: 'Agujas espinales 22G (3½")',                        code: "PUN-003" },
-      { id: "pun004", name: 'Agujas espinales 18G (3½")',                        code: "PUN-004" },
-      { id: "pun005", name: "Aguja Punción 14GA×20cm Biocore II BR",             code: "PUN-005" },
-      { id: "pun006", name: "Aguja Punción 16GA×20cm Biocore II BR",             code: "PUN-006" },
-      { id: "pun007", name: "Aguja Punción 18GA×20cm Biocore II BR",             code: "PUN-007" },
-      { id: "pun008", name: "Aguja Punta Fina Mama 14GA×10cm",                   code: "PUN-008" },
-      { id: "pun009", name: "Aguja Punta Fina Mama 5.5×40cm",                    code: "PUN-009" },
-      { id: "pun010", name: "Aguja Punta Fina Mama 18GA×10cm Argon",             code: "PUN-010" },
-      { id: "pun011", name: "Marcador Mamawire Fix 18Ga×10 Histo",               code: "PUN-011" },
-      { id: "pun012", name: "Marcador Mamawire Pre QX 20Ga×7 Histo",             code: "PUN-012" },
-      { id: "pun013", name: "Guantes Manoplas de Nylon",                          code: "PUN-013" },
-      { id: "pun014", name: "Guantes estériles (6½) xUn",                        code: "PUN-014" },
-      { id: "pun015", name: "Guantes estériles (7) xUn",                         code: "PUN-015" },
-      { id: "pun016", name: "Guantes estériles (7½) xUn",                        code: "PUN-016" },
-      { id: "pun017", name: "Guantes estériles (8) xUn",                         code: "PUN-017" },
-      { id: "pun018", name: "Guantes estériles (8½) xUn",                        code: "PUN-018" },
-      { id: "pun019", name: "Bisturí N°11",                                       code: "PUN-019" },
-      { id: "pun020", name: "Bisturí N°15",                                       code: "PUN-020" },
-      { id: "pun021", name: "Bisturí N°22",                                       code: "PUN-021" },
-      { id: "pun022", name: "Porta Objetos (×50un)",                              code: "PUN-022" },
-      { id: "pun023", name: "Clip de biopsia",                                     code: "PUN-023" },
-      { id: "pun024", name: "Arpón",                                               code: "PUN-024" },
-    ]
-  },
-  "Medicamentos": {
-    icon: "💊", color: "rgba(48,209,88,0.10)",
-    items: [
-      { id: "med001", name: "Dexametasona ampolla (2ml)",                              code: "MED-001" },
-      { id: "med002", name: "Difenhidramina clorhidrato ampolla (10mg)",               code: "MED-002" },
-      { id: "med003", name: "Corteroid Retard (Betametasona) ampolla (2ml)",           code: "MED-003" },
-      { id: "med004", name: "Heparina sódica (5ml)",                                   code: "MED-004" },
-      { id: "med005", name: "Hidrocortisona ampolla/polvo (500mg)",                    code: "MED-005" },
-      { id: "med006", name: "Hidrocortisona ampolla/polvo (100mg)",                    code: "MED-006" },
-      { id: "med007", name: "Hidrocortisona crema (15mg)",                             code: "MED-007" },
-      { id: "med008", name: "Hioscina – Buscapina ampolla (1ml)",                      code: "MED-008" },
-      { id: "med009", name: "Metoclopramida ampolla (2ml)",                            code: "MED-009" },
-      { id: "med010", name: "Adrenalina ampolla (1ml)",                                code: "MED-010" },
-      { id: "med011", name: "Solución Fisiológica ampolla",                            code: "MED-011" },
-      { id: "med012", name: "Lidocaína ampolla LAVIMAR (5ml)",                         code: "MED-012" },
-      { id: "med013", name: "Lidocaína Gel pomo (25ml)",                               code: "MED-013" },
-      { id: "med014", name: "Atropina Sulfato (1ml)",                                  code: "MED-014" },
-      { id: "med015", name: "Ondansetrón (8ml)",                                       code: "MED-015" },
-      { id: "med016", name: "Ranitidina 50mg",                                         code: "MED-016" },
-      { id: "med017", name: "Sevorane / Sevoflurano",                                  code: "MED-017" },
-      { id: "med018", name: "Suero cloruro de sodio (500ml)",                          code: "MED-018" },
-      { id: "med019", name: "Suero cloruro de sodio (250ml)",                          code: "MED-019" },
-      { id: "med020", name: "Suero cloruro de sodio (100ml)",                          code: "MED-020" },
-      { id: "med021", name: "Agua destilada 500ml",                                    code: "MED-021" },
-      { id: "med022", name: "Solución manitol al 15% (500ml)",                         code: "MED-022" },
-      { id: "med023", name: "Solución Dextrosa 5%",                                    code: "MED-023" },
-      { id: "med024", name: "Solución de Lugol (500ml)",                               code: "MED-024" },
-      { id: "med025", name: "Solución ácido acético (500ml)",                          code: "MED-025" },
-    ]
-  },
-  "Contrastes y Otros": {
-    icon: "🩻", color: "rgba(90,200,250,0.12)",
-    items: [
-      { id: "con001", name: "Contraste ULTRAVIST 300 BAYER 50ml ×48",          code: "CON-001" },
-      { id: "con002", name: "Contraste ULTRAVIST 300 BAYER 100ml ×36",         code: "CON-002" },
-      { id: "con003", name: "Contraste ULTRAVIST 370 BAYER 50ml ×48",          code: "CON-003" },
-      { id: "con004", name: "Contraste ULTRAVIST 370 BAYER 100ml ×36",         code: "CON-004" },
-      { id: "con005", name: "Contraste EZCAT / TRIYOSOM",                       code: "CON-005" },
-      { id: "con006", name: "Contraste Gadovist Gadolinio",                     code: "CON-006" },
-      { id: "con007", name: "Contraste Primovist Bayer",                        code: "CON-007" },
-      { id: "con008", name: "KIT BOMBA RESO",                                   code: "CON-008" },
-      { id: "con009", name: "Gastropaque S (Sulfato de Bario) + Efev.",         code: "CON-009" },
-      { id: "con010", name: "Jeringa dual con Espiga TAC (×20)",                code: "CON-010" },
-      { id: "con011", name: "Jeringa dual con espiga y tubo RESO (×50)",        code: "CON-011" },
-      { id: "con012", name: "Tubo conector baja presión RESO-TAC (×50)",        code: "CON-012" },
-      { id: "con013", name: "Accesorio para contraste Colon",                   code: "CON-013" },
-      { id: "con014", name: "Prolongador / Extensor 50cm",                      code: "CON-014" },
-    ]
-  },
-  "Impresiones y Oficina": {
-    icon: "🖨️", color: "rgba(255,149,0,0.12)",
-    items: [
-      { id: "imp001", name: "CD fondo blanco",                                   code: "IMP-001" },
-      { id: "imp002", name: "DVD Tomosíntesis 8Gb",                              code: "IMP-002" },
-      { id: "imp003", name: "DVD fondo blanco",                                  code: "IMP-003" },
-      { id: "imp004", name: "CD Sobres",                                         code: "IMP-004" },
-      { id: "imp005", name: "Sobres Área Mujer",                                 code: "IMP-005" },
-      { id: "imp006", name: "Sobres Institucional",                              code: "IMP-006" },
-      { id: "imp007", name: "Sobre 12×35 (×500)",                                code: "IMP-007" },
-      { id: "imp008", name: "Sobre 19×24 (×250) Densitometría",                  code: "IMP-008" },
-      { id: "imp009", name: "Cajas de resmas (×12)",                             code: "IMP-009" },
-      { id: "imp010", name: "Placas mamografía 25×25 (×125u)",                   code: "IMP-010" },
-      { id: "imp011", name: "Pen Drive",                                         code: "IMP-011" },
-      { id: "imp012", name: "Máscaras protectoras faciales",                     code: "IMP-012" },
-      { id: "imp013", name: "Jabón Líquido Clorhexidina 4% Laclorhex",           code: "IMP-013" },
-      { id: "imp014", name: "Cinta adhesiva",                                    code: "IMP-014" },
-      { id: "imp015", name: "Papel post-it",                                     code: "IMP-015" },
-      { id: "imp016", name: "Hoja membretada",                                   code: "IMP-016" },
-      { id: "imp017", name: "Clips metálicos",                                   code: "IMP-017" },
-      { id: "imp018", name: "Carpeta Área Mujer",                                code: "IMP-018" },
-      { id: "imp019", name: "QR Entrega Digital",                                code: "IMP-019" },
-      { id: "imp020", name: "Etiqueta",                                          code: "IMP-020" },
-      { id: "imp021", name: "Resmas",                                            code: "IMP-021" },
-      { id: "imp022", name: "Lapicera negra",                                    code: "IMP-022" },
-      { id: "imp023", name: "Pilas AAA",                                         code: "IMP-023" },
-      { id: "imp024", name: "Pilas AA",                                          code: "IMP-024" },
-      { id: "imp025", name: "Tóner CIAN – IM C300",                              code: "IMP-025" },
-      { id: "imp026", name: "Tóner AMARILLO – IM C300",                          code: "IMP-026" },
-      { id: "imp027", name: "Tóner NEGRO – IM C300",                             code: "IMP-027" },
-      { id: "imp028", name: "Tóner MAGENTA – IM C300",                           code: "IMP-028" },
-      { id: "imp029", name: "Tóner IM 430",                                      code: "IMP-029" },
-      { id: "imp030", name: "Tóner SP 3710DN (QR)",                              code: "IMP-030" },
-    ]
-  },
-  "Insumos Alimenticios": {
-    icon: "☕", color: "rgba(162,132,94,0.12)",
-    items: [
-      { id: "ali001", name: "Leche en polvo",       code: "ALI-001" },
-      { id: "ali002", name: "Yerba mate",            code: "ALI-002" },
-      { id: "ali003", name: "Mate cocido",           code: "ALI-003" },
-      { id: "ali004", name: "Azúcar",                code: "ALI-004" },
-      { id: "ali005", name: "Café instantáneo",      code: "ALI-005" },
-      { id: "ali006", name: "Café para cafetera",    code: "ALI-006" },
-      { id: "ali007", name: "Sal",                   code: "ALI-007" },
-      { id: "ali008", name: "Aceite",                code: "ALI-008" },
-      { id: "ali009", name: "Vinagre",               code: "ALI-009" },
-      { id: "ali010", name: "Té",                    code: "ALI-010" },
-      { id: "ali011", name: "Vasos térmicos",        code: "ALI-011" },
-      { id: "ali012", name: "Vasos",                 code: "ALI-012" },
-      { id: "ali013", name: "Rollos de papel",       code: "ALI-013" },
-      { id: "ali014", name: "Resaltador",            code: "ALI-014" },
-    ]
-  },
+const CAT_CONFIG = {
+  "Descartables":              {icon:"💉", color:"rgba(0,122,255,0.12)"},
+  "Punción":                   {icon:"🔬", color:"rgba(191,90,242,0.10)"},
+  "Ginecología e Instrumental":{icon:"🩺", color:"rgba(255,45,85,0.10)"},
+  "Ginecología":               {icon:"🩺", color:"rgba(255,45,85,0.10)"},
+  "Contrastes y Otros":        {icon:"🩻", color:"rgba(90,200,250,0.12)"},
+  "Medicamentos":              {icon:"💊", color:"rgba(48,209,88,0.10)"},
+  "Impresiones y Oficina":     {icon:"🖨️", color:"rgba(255,149,0,0.12)"},
+  "Insumos Alimenticios":      {icon:"☕", color:"rgba(162,132,94,0.12)"},
 };
 
-// ─── State ──────────────────────────────────────────────────────────────────
+let SUPPLIES = {};
 const qty = {};
-Object.values(SUPPLIES).forEach(cat =>
-  cat.items.forEach(item => { qty[item.id] = { cantidad: 0, caja: 0, pack: 0 }; })
-);
 
 let customItems = [];
 let _customSeq = 0;
@@ -1093,6 +910,10 @@ function renderAll(filter) { renderSupplies(filter || ""); }
 function renderSupplies(filter) {
   const container = document.getElementById("suppliesContainer");
   container.innerHTML = "";
+  if(!Object.keys(SUPPLIES).length){
+    container.innerHTML='<div style="text-align:center;padding:48px 16px;color:#8e8e93"><div style="font-size:2rem;margin-bottom:12px">⏳</div><div style="font-weight:600">Cargando insumos...</div></div>';
+    return;
+  }
   const q = filter.toLowerCase().trim();
   let anyResult = false;
 
@@ -1434,12 +1255,12 @@ function confirmClear() {
 }
 
 // ─── Toast ──────────────────────────────────────────────────────────────────
-function toast(msg) {
+function toast(msg, duration) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove("show"), 2600);
+  toast._t = setTimeout(() => el.classList.remove("show"), duration || 3200);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1460,42 +1281,82 @@ function compareSemver(a, b) {
 // ─── Update system ───────────────────────────────────────────────────────────
 document.getElementById("versionLabel").textContent = "V" + CURRENT_VERSION;
 
+// Obtiene la version.json fresca sin importar el cache CDN.
+// Estrategia: intenta GitHub API (siempre fresco) → fallback local con cache:reload
+async function _fetchLatestVersion() {
+  // 1. GitHub API — bypasa Fastly CDN de GitHub Pages, siempre devuelve el HEAD actual
+  try {
+    const apiUrl = "https://api.github.com/repos/Ivangn9/Insumos-Cima/contents/version.json";
+    const res = await fetch(apiUrl, {
+      cache: "no-store",
+      headers: { "Accept": "application/vnd.github.v3+json" }
+    });
+    if (res.ok) {
+      const meta = await res.json();
+      // El contenido viene en base64
+      const raw = atob(meta.content.replace(/\n/g, ""));
+      return JSON.parse(raw);
+    }
+  } catch(e) {}
+  // 2. Fallback: version.json local con cache:reload (fuerza red, no CDN cache)
+  const res = await fetch("./version.json", { cache: "reload" });
+  return await res.json();
+}
+
+// Limpia todos los caches y fuerza fetch fresco antes de navegar
+async function applyUpdate() {
+  toast("Actualizando...");
+  // 1. Borrar Service Worker caches si existen
+  if ("caches" in window) {
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    } catch(e) {}
+  }
+  // 2. Forzar descarga fresca del HTML con doble fetch (URL base + URL con timestamp)
+  const base    = location.pathname.split("?")[0];
+  const freshUrl = base + "?v=" + Date.now();
+  try {
+    // Fetch sin cache para refrescar la caché HTTP del navegador
+    await Promise.all([
+      fetch(base,     { cache: "reload" }).catch(() => {}),
+      fetch(freshUrl, { cache: "no-store" }).catch(() => {})
+    ]);
+    location.replace(freshUrl);
+  } catch(e) {
+    location.replace(base + "?v=" + Date.now());
+  }
+}
+
 async function checkUpdate(userTriggered = true) {
-  const btn  = document.getElementById("btnUpdate");
-  const icon = document.getElementById("updateIcon");
-  btn.classList.add("loading");
+  const btn = document.getElementById("btnUpdate");
   btn.disabled = true;
+  btn.classList.add("loading");
 
   try {
-    const url = "./version.json?t=" + Date.now();
-    const res  = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("no file");
-    const data = await res.json();
+    const data = await _fetchLatestVersion();
     const latest = data.version || CURRENT_VERSION;
 
     if (compareSemver(latest, CURRENT_VERSION) > 0) {
       document.getElementById("versionDot").classList.add("outdated");
       document.getElementById("newVersionLabel").textContent = "V" + latest;
       document.getElementById("updateBanner").classList.add("visible");
-      if (userTriggered) toast("Nueva versión V" + latest + " disponible ↑");
+      // Si el usuario tocó el botón → actualizar de inmediato, sin pasos extra
+      if (userTriggered) { await applyUpdate(); return; }
+      // Auto-check silencioso + sin datos cargados → actualizar solo
+      if (!hasUnsavedData()) { await applyUpdate(); return; }
+      // Tiene datos cargados → solo mostrar banner para que decida
     } else {
       document.getElementById("versionDot").classList.remove("outdated");
       document.getElementById("updateBanner").classList.remove("visible");
-      if (userTriggered) toast("Ya tenés la versión más reciente ✓");
+      if (userTriggered) toast("Ya tenés la última versión ✓");
     }
   } catch {
-    if (userTriggered) toast("No se pudo verificar actualizaciones");
+    if (userTriggered) toast("Sin conexión – no se pudo verificar");
   } finally {
-    btn.classList.remove("loading");
     btn.disabled = false;
+    btn.classList.remove("loading");
   }
-}
-
-function applyUpdate() {
-  if ("caches" in window) {
-    caches.keys().then(names => names.forEach(n => caches.delete(n)));
-  }
-  location.href = location.pathname + "?v=" + Date.now();
 }
 
 function hasUnsavedData() {
@@ -1504,30 +1365,14 @@ function hasUnsavedData() {
   return Object.values(qty).some(q => q.cantidad > 0 || q.caja > 0 || q.pack > 0);
 }
 
-let _latestVersion = null;
+// Auto-check al cargar (silencioso) + reintento rápido a los 15 s
+window.addEventListener("load", () => {
+  checkUpdate(false);
+  setTimeout(() => checkUpdate(false), 15000);
+});
 
-// Auto-check on load (silent)
-window.addEventListener("load", () => checkUpdate(false));
-
-// Chequeo automático cada 5 minutos
-setInterval(async () => {
-  try {
-    const res  = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
-    const data = await res.json();
-    const latest = data.version || CURRENT_VERSION;
-    if (compareSemver(latest, CURRENT_VERSION) > 0) {
-      _latestVersion = latest;
-      document.getElementById("versionDot").classList.add("outdated");
-      document.getElementById("newVersionLabel").textContent = "V" + latest;
-      document.getElementById("updateBanner").classList.add("visible");
-      if (!hasUnsavedData()) {
-        // Sin datos cargados: recarga automática silenciosa
-        applyUpdate();
-      }
-      // Con datos cargados: solo muestra el banner, no recarga
-    }
-  } catch { /* sin conexión, ignorar */ }
-}, 5 * 60 * 1000);
+// Chequeo automático cada 3 minutos
+setInterval(() => checkUpdate(false), 3 * 60 * 1000);
 
 // ─── Export PDF ──────────────────────────────────────────────────────────────
 function exportPDF() {
@@ -1855,7 +1700,29 @@ function _iosFallback(doc, fname) {
   toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
 }
 
+// ─── Supplies loader (Firestore) ─────────────────────────────────────────────
+function loadSuppliesFromFirestore(){
+  window._pedidoDB.collection("insumos_cima").doc("supplies").onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const data=(snap.data().data||[]).filter(s=>s.active!==false);
+    const newSupplies={};
+    data.forEach(s=>{
+      const cat=s.category||"Otros";
+      const cfg=CAT_CONFIG[cat]||{icon:"📦",color:"rgba(142,142,147,0.12)"};
+      if(!newSupplies[cat]) newSupplies[cat]={icon:cfg.icon,color:cfg.color,items:[]};
+      newSupplies[cat].items.push({id:s.id,name:s.name,code:s.code||""});
+      if(!qty[s.id]) qty[s.id]={cantidad:0,caja:0,pack:0};
+    });
+    SUPPLIES=newSupplies;
+    renderAll(document.getElementById("searchInput")?.value||"");
+    refreshStats();
+  },e=>console.warn("Supplies load error:",e));
+}
+
 // ─── Firebase / Solicitudes ───────────────────────────────────────────────────
+let _firebaseAuthReady = false;
+let _firebaseAuthError = null;
+
 (function initFirebasePedido(){
   const cfg = {
     apiKey: "AIzaSyDpzlN1gaJUH6XGAWv5GRW_suk7zcqKeJE",
@@ -1868,16 +1735,35 @@ function _iosFallback(doc, fname) {
   try{
     if(!firebase.apps.length) firebase.initializeApp(cfg);
     window._pedidoDB = firebase.firestore();
-    // Wait for auth state — use existing Google session if available, else anon
+    loadSuppliesFromFirestore();
     firebase.auth().onAuthStateChanged(user=>{
-      if(!user) firebase.auth().signInAnonymously().catch(e=>console.warn("anon auth:",e));
+      if(user){
+        _firebaseAuthReady = true;
+        _firebaseAuthError = null;
+        console.log("Firebase auth OK:", user.isAnonymous ? "anónimo" : user.email);
+      } else {
+        firebase.auth().signInAnonymously()
+          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; })
+          .catch(e=>{
+            _firebaseAuthError = e.code||e.message;
+            console.warn("Firebase anon auth falló:", e.code, e.message);
+          });
+      }
     });
   }catch(e){console.error("Firebase init:",e);}
 })();
 
 async function _ensurePedidoAuth(){
-  if(firebase.auth().currentUser) return;
-  await firebase.auth().signInAnonymously();
+  const user = firebase.auth().currentUser;
+  if(user) return;
+  try {
+    await firebase.auth().signInAnonymously();
+  } catch(e) {
+    if(e.code === 'auth/operation-not-allowed'){
+      throw new Error('AUTH_DISABLED: El inicio de sesión anónimo no está habilitado. Activalo en Firebase Console → Authentication → Sign-in method → Anonymous.');
+    }
+    throw e;
+  }
 }
 
 async function enviarPedido(){
@@ -1887,10 +1773,10 @@ async function enviarPedido(){
   if(!fecha){toast("⚠️ Seleccioná la fecha");return;}
   const hasItems=Object.values(qty).some(v=>v.cantidad>0||v.caja>0||v.pack>0)||customItems.some(ci=>(ci.cantidad||0)>0);
   if(!hasItems){toast("⚠️ Agregá al menos un insumo al pedido");return;}
+  if(!window._pedidoDB){toast("⚠️ Firebase no disponible · Recargá la página");return;}
   const btn=document.getElementById("btnEnviar");
   if(btn){btn.disabled=true;btn.innerHTML='<span class="btn-icon">⏳</span> Enviando...';}
   try{
-    // Collect items (not PDF — too large for Firestore)
     const items=[];
     Object.entries(SUPPLIES).forEach(([catName,cat])=>{
       cat.items.filter(item=>hasQty(item.id)).forEach(item=>{
@@ -1904,27 +1790,58 @@ async function enviarPedido(){
       items.push({id:item.id,name:item.name,cat:"Adicionales",
         cantidad:q.cantidad||0,caja:q.caja||0,pack:q.pack||0,custom:true});
     });
-    // Ensure authenticated
-    await _ensurePedidoAuth();
-    // Write to insumos_cima/solicitudes_log/items (same collection, existing rules apply)
+    // Authenticate (Google session if available, else anonymous)
+    try{ await _ensurePedidoAuth(); }
+    catch(authErr){
+      console.warn("Auth no disponible, intentando escribir de todas formas:", authErr.message);
+    }
+    const payload = {
+      timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+      fecha,solicitante,
+      sector:document.getElementById("sector").value||"",
+      prioridad:document.getElementById("prioridad").value||"Normal",
+      equipo:document.getElementById("equipo").value||"",
+      observaciones:(document.getElementById("observaciones").value||"").trim(),
+      items,
+      totalItems:items.length,
+      leido:false
+    };
+    console.log("Enviando pedido a Firestore...", {user: firebase.auth().currentUser?.uid||"sin auth", items:items.length});
     await window._pedidoDB
-      .collection("insumos_cima").doc("solicitudes_log").collection("items").add({
-        timestamp:firebase.firestore.FieldValue.serverTimestamp(),
-        fecha,solicitante,
-        sector:document.getElementById("sector").value||"",
-        prioridad:document.getElementById("prioridad").value||"Normal",
-        equipo:document.getElementById("equipo").value||"",
-        observaciones:(document.getElementById("observaciones").value||"").trim(),
-        items,
-        totalItems:items.length,
-        leido:false
-      });
+      .collection("insumos_cima").doc("solicitudes_log").collection("items").add(payload);
+    console.log("Pedido enviado OK");
     toast("✓ Pedido enviado correctamente");
-  }catch(e){
-    console.error("enviarPedido error:",e);
-    toast("⚠️ Error al enviar: "+(e.message||String(e)).slice(0,80));
-  }finally{
-    if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}
+  } catch(e) {
+    console.error("enviarPedido error:", e.code, e.message, e);
+    const raw = e.message || String(e);
+    let title = "No se pudo enviar el pedido";
+    let desc  = "";
+
+    if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
+      title = "Sin permiso de escritura";
+      desc  = "Firebase rechazó el pedido por falta de permisos.\n\nSolución: activá el acceso anónimo en Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+    } else if (raw.includes("AUTH_DISABLED") || raw.includes("auth/operation-not-allowed")) {
+      title = "Autenticación no habilitada";
+      desc  = "El acceso anónimo está desactivado en Firebase.\n\nSolución: Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+    } else if (e.code === "unavailable" || raw.includes("network") || raw.includes("fetch")) {
+      title = "Sin conexión";
+      desc  = "No se pudo conectar con el servidor. Revisá tu conexión a internet y volvé a intentar.";
+    } else if (e.code === "not-found") {
+      title = "Base de datos no encontrada";
+      desc  = "No se encontró la colección en Firestore. Verificá la configuración de Firebase.";
+    } else if (e.code === "unauthenticated") {
+      title = "Sesión expirada";
+      desc  = "Tu sesión venció. Recargá la página e intentá de nuevo.";
+    } else {
+      desc = raw.slice(0, 200);
+    }
+
+    // Mostrar modal de error (no desaparece solo — el usuario tiene que cerrarlo)
+    document.getElementById("errorTitle").textContent = title;
+    document.getElementById("errorDesc").textContent  = desc;
+    document.getElementById("errorOverlay").classList.add("open");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon">&#10148;</span> Enviar Pedido'; }
   }
 }
 </script>
