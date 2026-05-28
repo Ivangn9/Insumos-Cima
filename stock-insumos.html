@@ -587,6 +587,21 @@
     }
     @keyframes toastIn  { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
     @keyframes toastOut { from { opacity:1 } to { opacity:0 } }
+    @keyframes notifDrop { from { opacity:0; transform:translateY(-24px) scale(.95) } to { opacity:1; transform:translateY(0) scale(1) } }
+    @keyframes notifFade { from { opacity:1; transform:translateY(0) scale(1) } to { opacity:0; transform:translateY(-12px) scale(.97) } }
+    .in-app-notif {
+      position:fixed; top:18px; right:18px; z-index:99999;
+      background:rgba(28,28,30,.96); color:#fff;
+      border-radius:18px; padding:14px 16px;
+      min-width:270px; max-width:340px;
+      box-shadow:0 8px 32px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+      backdrop-filter:blur(24px) saturate(180%);
+      -webkit-backdrop-filter:blur(24px) saturate(180%);
+      display:flex; align-items:flex-start; gap:12px;
+      cursor:pointer; border:1px solid rgba(255,255,255,.10);
+      animation: notifDrop .38s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .in-app-notif.hiding { animation: notifFade .28s ease forwards; }
     .footer {
       text-align: center; padding: 28px 0 8px;
       font-size: 11px; color: var(--text3);
@@ -1946,7 +1961,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.6";
+const APP_VERSION = "4.7";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2217,6 +2232,7 @@ const DB_USERS    = "insumos_users";
 let currentUser = null, isAdmin = false, _lastUsers = [];
 let _unsubSupplies, _unsubGN, _unsubSarm, _unsubUsers, _unsubSolicitudes;
 let solicitudes = [];
+let _knownSolicitudIds = null; // null = primera carga, no notificar
 
 // ─── State ───────────────────────────────────────────────────────────────────
 function buildDefaultSupplies(){
@@ -3340,11 +3356,16 @@ function startListeners(){
 
   _unsubSolicitudes = _db.collection("insumos_cima").doc("solicitudes_log")
     .collection("items").onSnapshot(snap=>{
-      solicitudes=snap.docs.map(d=>({id:d.id,...d.data()}))
+      const all=snap.docs.map(d=>({id:d.id,...d.data()}))
         .sort((a,b)=>{
           const ta=a.timestamp?.seconds||0,tb=b.timestamp?.seconds||0;
           return tb-ta;
         });
+      if(_knownSolicitudIds!==null){
+        all.filter(s=>!_knownSolicitudIds.has(s.id)).forEach(s=>notifyNuevaSolicitud(s));
+      }
+      _knownSolicitudIds=new Set(all.map(s=>s.id));
+      solicitudes=all;
       updateSolicitudesBadge();
       if(currentTab==="solicitudes")renderSolicitudes();
     },e=>console.warn("solicitudes error:",e));
@@ -4059,6 +4080,50 @@ function renderVencimientos(){
         </div>`;
       }).join("")}
     </div>`).join("");
+}
+
+// ─── NOTIFICACIONES IN-APP ───────────────────────────────────────────────────
+function playNotifSound(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [[0,.06,880],[.13,.05,1108],[.24,.07,1320]].forEach(([t,vol,freq])=>{
+      const osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type="sine"; osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0,ctx.currentTime+t);
+      gain.gain.linearRampToValueAtTime(vol,ctx.currentTime+t+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+t+0.28);
+      osc.start(ctx.currentTime+t); osc.stop(ctx.currentTime+t+0.3);
+    });
+  }catch(e){}
+}
+function showInAppNotif(icon,title,body,onClick){
+  const el=document.createElement("div");
+  el.className="in-app-notif";
+  const prioColor={"Muy urgente":"#ff453a","Urgente":"#ff9f0a","Normal":"#30d158"}[body?.split("·")[1]?.trim()]||"#30d158";
+  el.innerHTML=`<div style="font-size:1.6rem;flex-shrink:0;line-height:1">${icon}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:.88rem;margin-bottom:3px">${escHtml(title)}</div>
+      <div style="font-size:.76rem;color:rgba(255,255,255,.68);line-height:1.4">${escHtml(body||"")}</div>
+    </div>
+    <div style="font-size:.7rem;color:rgba(255,255,255,.35);flex-shrink:0;margin-top:2px">ahora</div>`;
+  el.onclick=()=>{ dismiss(); if(onClick)onClick(); };
+  document.body.appendChild(el);
+  const tid=setTimeout(dismiss,5500);
+  function dismiss(){
+    clearTimeout(tid);
+    el.classList.add("hiding");
+    setTimeout(()=>el.remove(),300);
+  }
+}
+function notifyNuevaSolicitud(s){
+  playNotifSound();
+  const prio=s.prioridad||"Normal";
+  const body=`${s.solicitante||"—"} · ${prio} · ${s.sector||""} · ${(s.items||[]).length} insumos`;
+  showInAppNotif("📬","Nueva solicitud",body,()=>{
+    sidebarNav("solicitudes");
+    setTimeout(()=>openSolicitudDetalle(s.id),150);
+  });
 }
 
 // ─── SOLICITUDES ─────────────────────────────────────────────────────────────
