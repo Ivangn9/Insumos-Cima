@@ -1,0 +1,8 @@
+practicas: [
+  {
+    id, nombre,
+    insumos: [
+      { insumoId: "<id del catálogo>", consumo: 0.05 }  // 5% de una unidad
+    ]
+  }
+]
