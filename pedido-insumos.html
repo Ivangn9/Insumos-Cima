@@ -862,7 +862,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.32";
+const CURRENT_VERSION = "1.0.33";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -932,17 +932,13 @@ function renderSupplies(filter) {
         <div class="cat-icon-wrap" style="background:${cat.color}">${cat.icon}</div>
         <span class="cat-title">${catName}</span>
       </div>
-      <div class="col-heads">
-        <span class="col-head">Cantidad</span>
-        <span class="col-head">Caja</span>
-        <span class="col-head">Pack</span>
-      </div>
     `;
 
     const card = document.createElement("div");
     card.className = "supply-card glass";
 
     filtered.forEach(item => {
+      const fmts = _getFormats(item.id);
       const row = document.createElement("div");
       row.className = "supply-row" + (hasQty(item.id) ? " active-row" : "");
       row.id = "row-" + item.id;
@@ -955,9 +951,9 @@ function renderSupplies(filter) {
           </div>
         </div>
         <div class="counters">
-          ${mkCtr(item.id, "cantidad", "UND")}
-          ${mkCtr(item.id, "caja",     "CAJA")}
-          ${mkCtr(item.id, "pack",     "PACK")}
+          ${fmts.includes("unidad") ? mkCtr(item.id, "cantidad", "UND")  : ""}
+          ${fmts.includes("caja")   ? mkCtr(item.id, "caja",     "CAJA") : ""}
+          ${fmts.includes("pack")   ? mkCtr(item.id, "pack",     "PACK") : ""}
         </div>
       `;
       card.appendChild(row);
@@ -979,11 +975,6 @@ function renderSupplies(filter) {
       <div class="cat-header">
         <div class="cat-icon-wrap" style="background:rgba(255,149,0,0.12)">📝</div>
         <span class="cat-title">Insumos Adicionales</span>
-      </div>
-      <div class="col-heads">
-        <span class="col-head">Cantidad</span>
-        <span class="col-head">Caja</span>
-        <span class="col-head">Pack</span>
       </div>
     `;
     const ccard = document.createElement("div");
@@ -1701,10 +1692,23 @@ function _iosFallback(doc, fname) {
 }
 
 // ─── Supplies loader (Firestore) ─────────────────────────────────────────────
+// Mapa id→pedidoFormatos para saber qué contadores mostrar en cada fila.
+// Si un insumo no tiene el campo (datos anteriores), muestra los 3 (retrocompat).
+window._pedidoFormatos = {};
+function _getFormats(id) {
+  var f = window._pedidoFormatos[id];
+  return (f && f.length) ? f : ["unidad","caja","pack"];
+}
+
 function loadSuppliesFromFirestore(){
   const CACHE_KEY="pedido_supplies_cache";
   function applySupplies(data){
     const newSupplies={};
+    // Actualizar mapa de formatos con los datos recibidos
+    data.forEach(s=>{
+      if(s.id && Array.isArray(s.pedidoFormatos) && s.pedidoFormatos.length)
+        window._pedidoFormatos[s.id] = s.pedidoFormatos;
+    });
     data.forEach(s=>{
       const cat=s.category||"Otros";
       const cfg=CAT_CONFIG[cat]||{icon:"📦",color:"rgba(142,142,147,0.12)"};

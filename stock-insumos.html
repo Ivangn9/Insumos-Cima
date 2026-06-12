@@ -536,6 +536,8 @@
     .type-toggle-btn.entrada.selected { background: var(--green); border-color: var(--green); color: white; box-shadow: 0 4px 12px rgba(52,199,89,.35); }
     .type-toggle-btn.salida  { background: rgba(255,59,48,.10); border-color: rgba(255,59,48,.18); color: #c0271f; }
     .type-toggle-btn.salida.selected  { background: var(--red); border-color: var(--red); color: white; box-shadow: 0 4px 12px rgba(255,59,48,.35); }
+    .fmt-pill { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:20px; border:1.5px solid rgba(0,0,0,0.10); background:rgba(0,0,0,0.04); cursor:pointer; font-size:.82rem; font-weight:600; color:var(--text3); transition:all .15s; user-select:none; -webkit-tap-highlight-color:transparent; }
+    .fmt-pill.active { background:rgba(0,113,227,0.10); border-color:#0071e3; color:#0071e3; }
     .modal-footer { display: flex; gap: 8px; padding: 16px 24px 0; }
     .modal-footer .btn { flex: 1; justify-content: center; }
 
@@ -1879,7 +1881,7 @@
         </div>
       </div>
       <div class="ff">
-        <div class="ff-label">Presentación</div>
+        <div class="ff-label">Presentación (gestión de stock)</div>
         <div class="mov-type-toggle" style="width:100%;margin-top:4px">
           <button id="editTogUnitario" class="type-toggle-btn entrada selected" style="flex:1" onclick="selectEditPresentacion('unitario')">📦 Unitario</button>
           <button id="editTogCaja"     class="type-toggle-btn salida"           style="flex:1" onclick="selectEditPresentacion('caja')">🗃️ Caja</button>
@@ -1888,6 +1890,15 @@
       <div class="ff" id="editCajaGroup" style="display:none">
         <div class="ff-label">Unidades por caja</div>
         <input class="inp" type="number" id="editUnidadesPorCaja" min="1" placeholder="Ej: 50" />
+      </div>
+      <div class="ff">
+        <div class="ff-label">Formatos disponibles para pedidos</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <button class="fmt-pill" id="editFmtUnidad" onclick="_toggleFmt('edit','unidad')">📦 Unidad</button>
+          <button class="fmt-pill" id="editFmtCaja"   onclick="_toggleFmt('edit','caja')">🗃️ Caja</button>
+          <button class="fmt-pill" id="editFmtPack"   onclick="_toggleFmt('edit','pack')">🎁 Pack</button>
+        </div>
+        <div style="font-size:.7rem;color:var(--text3);margin-top:5px">Formatos en que se puede pedir este insumo en la app de Pedidos. Seleccioná al menos uno.</div>
       </div>
       <input type="hidden" id="editSupplyId" />
       <div style="display:flex;gap:10px;margin-top:20px">
@@ -1946,7 +1957,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "4.6";
+const APP_VERSION = "4.7";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2636,6 +2647,21 @@ function renderGestion(){
 }
 function updatePrice(id,val){const s=supplies.find(x=>x.id===id);if(s){s.price=parseFloat(val)||0;persist();toast("Precio actualizado");}}
 
+// ─── Formatos de pedido ────────────────────────────────────────────────────────
+const _ALL_FMTS = ['unidad','caja','pack'];
+let _editFmts = new Set(_ALL_FMTS);
+function _toggleFmt(modal, fmt) {
+  const set = _editFmts;
+  if(set.has(fmt)){ if(set.size>1) set.delete(fmt); }
+  else set.add(fmt);
+  _ALL_FMTS.forEach(f=>{ const el=document.getElementById('editFmt'+f.charAt(0).toUpperCase()+f.slice(1)); if(el)el.classList.toggle('active',set.has(f)); });
+}
+function _setFmts(arr) {
+  _editFmts.clear();
+  (arr && arr.length ? arr : _ALL_FMTS).forEach(f=>_editFmts.add(f));
+  _ALL_FMTS.forEach(f=>{ const el=document.getElementById('editFmt'+f.charAt(0).toUpperCase()+f.slice(1)); if(el)el.classList.toggle('active',_editFmts.has(f)); });
+}
+
 // ─── Edit Supply ──────────────────────────────────────────────────────────────
 let _editPresentacion="unitario";
 function selectEditPresentacion(p){
@@ -2654,6 +2680,7 @@ function openEditSupplyModal(id){
   const catSel=document.getElementById("editSupplyCategory");
   catSel.innerHTML=getCategories().map(c=>`<option value="${escAttr(c)}"${c===s.category?" selected":""}>${escHtml(c)}</option>`).join("");
   selectEditPresentacion(s.presentacion||"unitario");
+  _setFmts(s.pedidoFormatos || _ALL_FMTS);
   document.getElementById("editSupplyOverlay").classList.add("open");
   setTimeout(()=>document.getElementById("editSupplyName").focus(),80);
 }
@@ -2666,9 +2693,10 @@ function saveEditSupply(){
   const category=document.getElementById("editSupplyCategory").value;
   const presentacion=_editPresentacion||"unitario";
   const unidadesPorCaja=presentacion==="caja"?(parseInt(document.getElementById("editUnidadesPorCaja").value)||1):1;
+  const pedidoFormatos=Array.from(_editFmts);
   if(!name){toast("⚠️ El nombre es obligatorio");return;}
   const s=supplies.find(x=>x.id===id); if(!s)return;
-  Object.assign(s,{name,code,unit,category,presentacion,unidadesPorCaja});
+  Object.assign(s,{name,code,unit,category,presentacion,unidadesPorCaja,pedidoFormatos});
   persist();
   closeEditSupplyModal();
   renderGestion();

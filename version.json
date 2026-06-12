@@ -1,5 +1,5 @@
 {
-  "version": "1.0.22",
-  "date": "2026-05-22",
-  "changelog": "Fix version mismatch; integracion con Stock de Insumos, boton Enviar Pedido"
+  "version": "1.0.33",
+  "date": "2026-06-12",
+  "changelog": "Formatos de pedido por insumo (Unidad/Caja/Pack) configurables desde stock — sincronizados via Firestore"
 }
