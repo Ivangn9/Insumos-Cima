@@ -1834,7 +1834,7 @@ async function enviarPedido(){
 
     if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
       title = "Sin permiso de escritura";
-      desc  = "Firebase rechazó el pedido por falta de permisos.\n\nSolución: activá el acceso anónimo en Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+      desc  = "Firebase rechazó el pedido: las reglas de seguridad de Firestore no permiten crear pedidos con acceso anónimo.\n\nSolución (administrador): publicar las reglas actualizadas (archivo firestore.rules) en Firebase Console → Firestore Database → Reglas → Publicar.";
     } else if (raw.includes("AUTH_DISABLED") || raw.includes("auth/operation-not-allowed")) {
       title = "Autenticación no habilitada";
       desc  = "El acceso anónimo está desactivado en Firebase.\n\nSolución: Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
