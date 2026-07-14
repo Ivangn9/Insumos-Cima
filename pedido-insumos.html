@@ -607,6 +607,230 @@
     .update-banner-text { font-size: 13px; font-weight: 560; color: rgba(120,70,0,0.9); }
     .update-banner-text strong { font-weight: 720; }
 
+    /* ─── Botón Pedidos en topbar ─────────────────────── */
+    .btn-pedidos {
+      position: relative;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      margin-left: 6px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-pedidos:hover  { background: rgba(255,255,255,0.22); }
+    .btn-pedidos:active { transform: scale(0.94); }
+    .pedidos-icon { font-size: 16px; line-height: 1; }
+    .pedidos-badge {
+      position: absolute; top: -5px; right: -5px;
+      min-width: 18px; height: 18px; padding: 0 5px;
+      background: #ff3b30; color: #fff;
+      border: 2px solid #28384c;
+      border-radius: 10px;
+      font-size: 10px; font-weight: 800; line-height: 14px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(255,59,48,0.4);
+    }
+
+    /* ─── Modal de Pedidos ────────────────────────────── */
+    .pedidos-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,20,40,0.55);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 9500;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.22s ease;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .pedidos-overlay.open { opacity: 1; pointer-events: all; }
+    .pedidos-sheet {
+      width: 100%; max-width: 640px;
+      height: 92vh; max-height: 92dvh;
+      background: linear-gradient(180deg, #f4f9fd 0%, #e6f0f8 100%);
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -8px 40px rgba(0,30,80,0.28);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+    .pedidos-overlay.open .pedidos-sheet { transform: translateY(0); }
+
+    .pedidos-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid rgba(0,60,120,0.08);
+      flex-shrink: 0;
+    }
+    .pedidos-title { display: flex; align-items: center; gap: 12px; }
+    .pedidos-title-icon {
+      width: 40px; height: 40px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #007AFF, #0055D4);
+      color: #fff; border-radius: 12px;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(0,122,255,0.28);
+    }
+    .pedidos-title-main { font-size: 17px; font-weight: 780; color: #1a2b40; }
+    .pedidos-title-sub  { font-size: 12px; font-weight: 500; color: #5a6b80; margin-top: 2px; }
+    .pedidos-close {
+      width: 34px; height: 34px;
+      background: rgba(0,20,60,0.06);
+      border: none; border-radius: 10px;
+      color: #4a5b70; font-size: 16px; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .pedidos-close:hover { background: rgba(0,20,60,0.12); }
+
+    .pedidos-tabs {
+      display: flex; gap: 6px;
+      padding: 12px 14px 10px;
+      background: rgba(255,255,255,0.5);
+      border-bottom: 1px solid rgba(0,60,120,0.06);
+      flex-shrink: 0;
+    }
+    .pedidos-tab {
+      flex: 1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px 8px;
+      background: rgba(255,255,255,0.4);
+      border: 1px solid rgba(0,60,120,0.08);
+      border-radius: 12px;
+      color: #4a5b70; font-size: 13px; font-weight: 620;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pedidos-tab.active {
+      background: #fff;
+      border-color: rgba(0,122,255,0.25);
+      color: #1a2b40;
+      box-shadow: 0 2px 8px rgba(0,80,200,0.10);
+    }
+    .pedidos-tab-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    .pedidos-tab-dot.pendiente { background: #ff9500; box-shadow: 0 0 8px rgba(255,149,0,0.6); }
+    .pedidos-tab-dot.entregado { background: #30d158; box-shadow: 0 0 8px rgba(48,209,88,0.6); }
+    .pedidos-tab-count {
+      min-width: 20px; padding: 1px 6px;
+      background: rgba(0,60,120,0.10);
+      border-radius: 10px;
+      font-size: 11px; font-weight: 780;
+    }
+    .pedidos-tab.active .pedidos-tab-count { background: rgba(0,122,255,0.14); color: #0055D4; }
+
+    .pedidos-body {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px 14px 24px;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .pedidos-loading, .pedidos-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px 20px; text-align: center; color: #5a6b80;
+    }
+    .pedidos-empty-icon {
+      width: 60px; height: 60px;
+      background: rgba(48,209,88,0.14);
+      color: #30d158;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .pedidos-empty-title { font-size: 16px; font-weight: 700; color: #1a2b40; margin-bottom: 4px; }
+    .pedidos-empty-sub   { font-size: 13px; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(0,122,255,0.14);
+      border-top-color: #007AFF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .pedidos-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .pedido-card {
+      background: #fff;
+      border: 1px solid rgba(0,60,120,0.10);
+      border-left: 4px solid #ff9500;
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 8px rgba(0,30,80,0.05);
+      transition: transform 0.08s, box-shadow 0.15s;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pedido-card:active { transform: scale(0.985); }
+    .pedido-card.entregado { border-left-color: #30d158; background: linear-gradient(180deg, #fff, #f4fbf6); }
+    .pedido-card.urgente     { border-left-color: #ff9500; }
+    .pedido-card.muy-urgente { border-left-color: #ff3b30; }
+
+    .pedido-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 10px; margin-bottom: 8px;
+    }
+    .pedido-solicitante { font-size: 15px; font-weight: 720; color: #1a2b40; }
+    .pedido-meta        { font-size: 12px; color: #5a6b80; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+    .pedido-meta b      { color: #1a2b40; font-weight: 600; }
+    .pedido-badge {
+      flex-shrink: 0;
+      padding: 3px 9px;
+      border-radius: 10px;
+      font-size: 11px; font-weight: 780; letter-spacing: 0.2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .pedido-badge.pendiente     { background: rgba(255,149,0,0.14); color: #b26a00; }
+    .pedido-badge.entregado     { background: rgba(48,209,88,0.16); color: #1a8f3c; }
+    .pedido-badge.urgente       { background: rgba(255,149,0,0.14); color: #b26a00; }
+    .pedido-badge.muy-urgente   { background: rgba(255,59,48,0.14); color: #b3221a; }
+
+    .pedido-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed rgba(0,60,120,0.10);
+      font-size: 12.5px;
+    }
+    .pedido-items-count { color: #5a6b80; font-weight: 600; }
+    .pedido-items-count b { color: #007AFF; font-weight: 780; }
+    .pedido-expand { color: #007AFF; font-weight: 620; font-size: 12px; }
+
+    .pedido-items {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.28s ease;
+    }
+    .pedido-card.expanded .pedido-items { max-height: 800px; }
+    .pedido-items-inner {
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid rgba(0,60,120,0.06);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .pedido-item-row {
+      display: flex; justify-content: space-between; gap: 10px;
+      font-size: 12.5px; color: #2a3b50;
+      padding: 5px 0;
+    }
+    .pedido-item-row .name { flex: 1; }
+    .pedido-item-row .qty  { color: #007AFF; font-weight: 720; flex-shrink: 0; }
+    .pedido-obs {
+      margin-top: 8px; padding: 8px 10px;
+      background: rgba(0,122,255,0.06);
+      border-radius: 8px;
+      font-size: 12px; color: #2a3b50; font-style: italic;
+    }
+
     /* ─── Responsive ───────────────────────────────── */
     @media (max-width: 600px) {
       .page { padding: calc(52px + 12px) 10px env(safe-area-inset-bottom, 12px); }
@@ -620,6 +844,8 @@
       .counters { width: 100%; justify-content: space-between; }
       .ctr-btn { width: 34px; height: 34px; }
       .stat-pill { min-width: calc(50% - 6px); }
+      /* Modal pedidos fullscreen en mobile */
+      .pedidos-sheet { height: 100dvh; max-height: 100dvh; border-radius: 0; }
     }
 
     @media (max-width: 360px) {
@@ -708,6 +934,10 @@
   <button class="btn-update" id="btnUpdate" onclick="checkUpdate()">
     <span class="spin" id="updateIcon">↻</span> Actualizar
   </button>
+  <button class="btn-pedidos" id="btnPedidos" onclick="openPedidosModal()" aria-label="Ver pedidos">
+    <span class="pedidos-icon">📬</span>
+    <span class="pedidos-badge" id="pedidosBadge" hidden></span>
+  </button>
 </div>
 
 <!-- ─── Fondo fijo (fixed, detrás de todo) ───────────── -->
@@ -715,6 +945,45 @@
 
 <!-- ─── Toast ───────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
+
+<!-- ─── Modal de Pedidos (fullscreen mobile) ────────── -->
+<div class="pedidos-overlay" id="pedidosOverlay" aria-hidden="true">
+  <div class="pedidos-sheet">
+    <header class="pedidos-header">
+      <div class="pedidos-title">
+        <span class="pedidos-title-icon">📬</span>
+        <div>
+          <div class="pedidos-title-main">Pedidos</div>
+          <div class="pedidos-title-sub">Últimos 10 días</div>
+        </div>
+      </div>
+      <button class="pedidos-close" onclick="closePedidosModal()" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="pedidos-tabs">
+      <button class="pedidos-tab active" data-tab="pendientes" onclick="switchPedidosTab('pendientes')">
+        <span class="pedidos-tab-dot pendiente"></span>
+        Pendientes <span class="pedidos-tab-count" id="countPendientes">0</span>
+      </button>
+      <button class="pedidos-tab" data-tab="entregados" onclick="switchPedidosTab('entregados')">
+        <span class="pedidos-tab-dot entregado"></span>
+        Entregados <span class="pedidos-tab-count" id="countEntregados">0</span>
+      </button>
+    </div>
+    <div class="pedidos-body">
+      <div class="pedidos-loading" id="pedidosLoading">
+        <div class="spinner"></div>
+        <div>Cargando pedidos…</div>
+      </div>
+      <div class="pedidos-list" id="listPendientes" hidden></div>
+      <div class="pedidos-list" id="listEntregados" hidden></div>
+      <div class="pedidos-empty" id="pedidosEmpty" hidden>
+        <div class="pedidos-empty-icon">✓</div>
+        <div class="pedidos-empty-title" id="pedidosEmptyTitle">Sin pedidos</div>
+        <div class="pedidos-empty-sub" id="pedidosEmptySub">No hay pedidos en los últimos 10 días</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ─── Page ────────────────────────────────────────── -->
 <div class="page">
@@ -862,7 +1131,7 @@
 })();
 
 // ─── Version ─────────────────────────────────────────────────────────────────
-const CURRENT_VERSION = "1.0.32";
+const CURRENT_VERSION = "1.0.33";
 
 // ─── PDF logo preload ────────────────────────────────────────────────────────
 let _pdfLogoB64 = null;
@@ -1752,9 +2021,10 @@ let _firebaseAuthError = null;
         _firebaseAuthReady = true;
         _firebaseAuthError = null;
         console.log("Firebase auth OK:", user.isAnonymous ? "anónimo" : user.email);
+        subscribeToPedidos();
       } else {
         firebase.auth().signInAnonymously()
-          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; })
+          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; subscribeToPedidos(); })
           .catch(e=>{
             _firebaseAuthError = e.code||e.message;
             console.warn("Firebase anon auth falló:", e.code, e.message);
@@ -1763,6 +2033,163 @@ let _firebaseAuthError = null;
     });
   }catch(e){console.error("Firebase init:",e);}
 })();
+
+// ─── Visor de pedidos (últimos 10 días) ─────────────────────────────────────
+let _pedidosData = [];
+let _pedidosUnsub = null;
+let _pedidosActiveTab = "pendientes";
+
+function subscribeToPedidos(){
+  if(!window._pedidoDB || _pedidosUnsub) return;
+  const hace10dias = new Date(Date.now() - 10*24*60*60*1000);
+  try{
+    _pedidosUnsub = window._pedidoDB
+      .collection("insumos_cima").doc("solicitudes_log").collection("items")
+      .where("timestamp", ">=", firebase.firestore.Timestamp.fromDate(hace10dias))
+      .orderBy("timestamp", "desc")
+      .onSnapshot(snap=>{
+        _pedidosData = snap.docs.map(d=>({id:d.id, ...d.data()}));
+        _updatePedidosBadge();
+        if(document.getElementById("pedidosOverlay").classList.contains("open")){
+          renderPedidos();
+        }
+      }, err=>console.warn("pedidos snapshot error:", err.code, err.message));
+  } catch(e) {
+    console.warn("subscribeToPedidos:", e);
+  }
+}
+
+function _updatePedidosBadge(){
+  const pendientes = _pedidosData.filter(p=>!p.entregado).length;
+  const badge = document.getElementById("pedidosBadge");
+  if(!badge) return;
+  if(pendientes > 0){
+    badge.textContent = pendientes > 99 ? "99+" : String(pendientes);
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
+function openPedidosModal(){
+  document.getElementById("pedidosOverlay").classList.add("open");
+  renderPedidos();
+}
+function closePedidosModal(){
+  document.getElementById("pedidosOverlay").classList.remove("open");
+}
+function switchPedidosTab(tab){
+  _pedidosActiveTab = tab;
+  document.querySelectorAll(".pedidos-tab").forEach(el=>{
+    el.classList.toggle("active", el.dataset.tab === tab);
+  });
+  renderPedidos();
+}
+
+function renderPedidos(){
+  const pendientes = _pedidosData.filter(p=>!p.entregado);
+  const entregados = _pedidosData.filter(p=>!!p.entregado);
+  document.getElementById("countPendientes").textContent = pendientes.length;
+  document.getElementById("countEntregados").textContent = entregados.length;
+  document.getElementById("pedidosLoading").hidden = true;
+
+  const list = _pedidosActiveTab === "pendientes" ? pendientes : entregados;
+  const listPend = document.getElementById("listPendientes");
+  const listEntr = document.getElementById("listEntregados");
+  const emptyEl  = document.getElementById("pedidosEmpty");
+
+  listPend.hidden = _pedidosActiveTab !== "pendientes";
+  listEntr.hidden = _pedidosActiveTab !== "entregados";
+
+  if(!list.length){
+    listPend.hidden = true; listEntr.hidden = true;
+    emptyEl.hidden = false;
+    if(_pedidosActiveTab === "pendientes"){
+      document.getElementById("pedidosEmptyTitle").textContent = "Sin pedidos pendientes";
+      document.getElementById("pedidosEmptySub").textContent   = "Todos los pedidos fueron entregados ✓";
+    } else {
+      document.getElementById("pedidosEmptyTitle").textContent = "Sin entregas registradas";
+      document.getElementById("pedidosEmptySub").textContent   = "No hay pedidos entregados en los últimos 10 días";
+    }
+    return;
+  }
+  emptyEl.hidden = true;
+  const target = _pedidosActiveTab === "pendientes" ? listPend : listEntr;
+  target.innerHTML = list.map(_pedidoCardHTML).join("");
+}
+
+function _pedidoCardHTML(p){
+  const isEntregado = !!p.entregado;
+  const prioridad   = (p.prioridad || "Normal");
+  const prioLower   = prioridad.toLowerCase().replace(/\s+/g, "-");
+  const solicitante = escHtml(p.solicitante || "Sin nombre");
+  const sector      = escHtml(p.sector || "—");
+  const equipo      = escHtml(p.equipo || "—");
+  const fecha       = _formatPedidoFecha(p);
+  const totalItems  = p.totalItems || (p.items ? p.items.length : 0);
+  const observaciones = (p.observaciones || "").trim();
+
+  const badgeClass = isEntregado
+    ? "entregado"
+    : (prioridad === "Muy urgente" ? "muy-urgente" : (prioridad === "Urgente" ? "urgente" : "pendiente"));
+  const badgeText  = isEntregado ? "Entregado" : prioridad;
+
+  const cardClass = isEntregado ? "entregado" : prioLower;
+
+  const itemsHTML = (p.items || []).map(it=>{
+    const parts = [];
+    if(it.cantidad > 0) parts.push(`${it.cantidad} UND`);
+    if(it.caja > 0)     parts.push(`${it.caja} caja`);
+    if(it.pack > 0)     parts.push(`${it.pack} pack`);
+    const qty = parts.join(" · ") || "—";
+    return `<div class="pedido-item-row">
+      <div class="name">${escHtml(it.name || "Sin nombre")}</div>
+      <div class="qty">${escHtml(qty)}</div>
+    </div>`;
+  }).join("");
+
+  const obsHTML = observaciones
+    ? `<div class="pedido-obs">💬 ${escHtml(observaciones)}</div>`
+    : "";
+
+  return `
+    <div class="pedido-card ${cardClass}" onclick="this.classList.toggle('expanded')">
+      <div class="pedido-head">
+        <div style="flex:1;min-width:0">
+          <div class="pedido-solicitante">${solicitante}</div>
+          <div class="pedido-meta">
+            <span>📅 <b>${fecha}</b></span>
+            <span>🏥 <b>${sector}</b></span>
+            <span>🩻 <b>${equipo}</b></span>
+          </div>
+        </div>
+        <span class="pedido-badge ${badgeClass}">${escHtml(badgeText)}</span>
+      </div>
+      <div class="pedido-footer">
+        <span class="pedido-items-count"><b>${totalItems}</b> ${totalItems === 1 ? "insumo" : "insumos"}</span>
+        <span class="pedido-expand">Ver detalle ▾</span>
+      </div>
+      <div class="pedido-items">
+        <div class="pedido-items-inner">${itemsHTML}${obsHTML}</div>
+      </div>
+    </div>`;
+}
+
+function _formatPedidoFecha(p){
+  if(p.fecha) return escHtml(p.fecha);
+  const ts = p.timestamp;
+  if(ts && ts.toDate){
+    const d = ts.toDate();
+    return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit"});
+  }
+  return "—";
+}
+
+// Cerrar modal con back button / gesto en Android
+window.addEventListener("popstate", ()=>{
+  const overlay = document.getElementById("pedidosOverlay");
+  if(overlay && overlay.classList.contains("open")) closePedidosModal();
+});
 
 async function _ensurePedidoAuth(){
   const user = firebase.auth().currentUser;

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.30",
-  "date": "2026-05-27",
-  "changelog": "Agrega Sala de Recuperacion al selector de Equipo"
+  "version": "1.0.33",
+  "date": "2026-07-14",
+  "changelog": "Visor de pedidos: boton en topbar con badge de pendientes, modal con tabs Pendientes/Entregados, ultimos 10 dias"
 }
