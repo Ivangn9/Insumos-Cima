@@ -1,0 +1,26 @@
+{
+  "name": "Gestión de Insumos CIMA",
+  "short_name": "Insumos CIMA",
+  "description": "Sistema de gestión de insumos médicos - CIMA",
+  "start_url": "stock-insumos.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#0071e3",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "Iconogestioninsumos.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "Iconogestioninsumos.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["medical", "health", "productivity"]
+}

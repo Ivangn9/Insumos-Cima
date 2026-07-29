@@ -1,0 +1,117 @@
+rules_version = '2';
+// ═══════════════════════════════════════════════════════════════
+// Reglas de seguridad — proyecto medtrack-cima-3e9c1
+// ⚠️ Este archivo es REFERENCIA: hay que pegarlo en
+// Firebase Console → Firestore Database → Reglas → Publicar.
+// El deploy de GitHub Pages NO aplica estas reglas.
+//
+// v2 — Corrige el bloqueo de la app "Pedido de Insumos" (anónima)
+// y agrega las colecciones del Stock que faltaban:
+// insumos_users, cima_backups, cima_audit.
+// v3 — El visor "Pendientes/Entregados" de Pedido de Insumos (login anónimo
+// por defecto) necesita LEER solicitudes_log/items para armar el badge y las
+// listas; antes solo isTeam() podía leer, así que a un usuario anónimo le
+// daba permission-denied en silencio y el visor quedaba siempre vacío.
+// ═══════════════════════════════════════════════════════════════
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isTeam() {
+      // Usuario real de Google (no anónimo)
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isAdmin() {
+      return isTeam() && request.auth.token.email == 'ivangarcian@gmail.com';
+    }
+
+    // Valida la forma del pedido creado por el formulario público (anónimo):
+    // solo los campos esperados, tipos correctos, y NUNCA ya marcado como entregado.
+    function isValidSolicitud(d) {
+      return d.keys().hasOnly(['timestamp','fecha','solicitante','sector','prioridad','equipo','observaciones','items','totalItems','leido'])
+        && d.solicitante is string && d.solicitante.size() < 200
+        && d.items is list && d.items.size() < 200
+        && d.leido == false
+        && !('entregado' in d) && !('recibidoPor' in d) && !('firma' in d);
+    }
+
+    // ── MedTrack ──
+    match /orgs/cima/app/public {
+      // Espejo público de los QR: cualquiera autenticado (incluye anónimo) lee.
+      // Solo el equipo escribe.
+      allow read: if request.auth != null;
+      allow write: if isTeam();
+    }
+
+    match /orgs/cima/app/{doc} {
+      // data + hist_eqs + hist_antenas + hist_ots (historiales sharded):
+      // SOLO para el equipo. Los QR (login anónimo) NO pueden leerlos.
+      allow read, write: if isTeam();
+    }
+
+    match /orgs/cima/backups/{doc} {
+      allow read, write: if isTeam();
+    }
+
+    match /orgs/cima/audit/{entry} {
+      // Historial de auditoría permanente: el equipo lee; solo se agrega, no se edita ni borra.
+      allow read: if isTeam();
+      allow create: if isTeam();
+      allow update, delete: if false;
+    }
+
+    // Migración legacy (docs personales viejos)
+    match /users/{uid}/app/data {
+      allow read, write: if isTeam() && request.auth.uid == uid;
+    }
+
+    // ── Stock de Insumos ──
+    // Catálogo: el formulario público "Pedido de Insumos" (login anónimo)
+    // necesita LEERLO para armar el pedido. Solo el equipo lo escribe.
+    match /insumos_cima/supplies {
+      allow read: if request.auth != null;
+      allow write: if isTeam();
+    }
+
+    // Pedidos enviados desde el formulario público: cualquiera autenticado
+    // (incluye anónimo) puede CREAR un pedido y LEER la lista (para el visor
+    // de Pendientes/Entregados — transparencia global, ver commit del
+    // visor). Marcar como entregado o borrar sigue siendo solo del equipo.
+    match /insumos_cima/solicitudes_log/items/{item} {
+      allow create: if request.auth != null && isValidSolicitud(request.resource.data);
+      allow read: if request.auth != null;
+      allow update, delete: if isTeam();
+    }
+
+    // Resto de Stock de Insumos (center_GN, center_Sarmiento, push_tokens,
+    // practicas_config, practicas_mes, entregas, …): solo el equipo.
+    match /insumos_cima/{doc=**} {
+      allow read, write: if isTeam();
+    }
+
+    // Usuarios autorizados del Stock: el equipo lee (chequeo de acceso al
+    // iniciar sesión); solo el admin agrega o quita usuarios.
+    match /insumos_users/{email} {
+      allow read: if isTeam();
+      allow write: if isAdmin();
+    }
+
+    // Respaldos diarios del Stock
+    match /cima_backups/{doc} {
+      allow read, write: if isTeam();
+    }
+
+    // Auditoría del Stock: solo se agrega, no se edita ni borra.
+    match /cima_audit/{entry} {
+      allow read: if isTeam();
+      allow create: if isTeam();
+      allow update, delete: if false;
+    }
+
+    // Todo lo demás: denegado
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
