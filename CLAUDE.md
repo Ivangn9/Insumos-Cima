@@ -11,7 +11,7 @@ Este repositorio contiene el sistema completo de **gestión de insumos médicos 
 
 Ambas leen/escriben la misma base Firestore (proyecto `medtrack-cima-3e9c1`, colección raíz `insumos_cima`). Cuando se edita el catálogo en `stock-insumos.html`, se refleja al instante en `pedido-insumos.html`, y viceversa: cuando una solicitud se marca como leída/entregada en `stock-insumos.html`, ese estado aparece también en `pedido-insumos.html`.
 
-`stock-insumos.html` además lee (solo lectura) el documento de equipos de **MedTrack** (`orgs/cima/app/data`, repo separado `github.com/Ivangn9/medtrack`) para mostrar conteos de entregas por categoría de equipo — es una dependencia de datos entre apps, no de código; funciona porque comparten el mismo proyecto Firebase.
+`stock-insumos.html` además intenta leer (solo lectura, `_loadEntregasCounts()` ~línea 7093) un documento de equipos para mostrar conteos de entregas por categoría — pero lee `users/{currentUser.uid}/app/data` (ruta LEGACY de MedTrack, un doc personal por uid), NO `orgs/cima/app/data` (la ruta actual de MedTrack, compartida por org). Corregido acá el 2026-07-29: la documentación anterior decía `orgs/cima/app/data`, estaba mal. Como el uid de un usuario de Insumos normalmente no tiene datos en esa ruta legacy, es probable que `_medtrackEqs` quede vacío en la práctica — parece un bug preexistente, no relacionado con el fix de seguridad de MedTrack del mismo día. No se tocó, queda para revisar si se pide puntualmente.
 
 ## `telicioso.html`
 
