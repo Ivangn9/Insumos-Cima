@@ -2,7 +2,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 // ── Auto-update: keep this in sync with APP_VERSION in stock-insumos.html ────
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 const CACHE_NAME  = 'cima-' + APP_VERSION;
 
 // Activate the new SW immediately — don't wait for tabs to close

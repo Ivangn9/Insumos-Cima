@@ -1703,6 +1703,18 @@
         <button class="btn btn-primary" onclick="openPriceImport()"><span class="btn-icon">📄</span> Importar lista de precios</button>
       </div>
     </div>
+
+    <!-- ─ Comparador de presupuestos de proveedores ─ -->
+    <div id="comparadorSection" style="display:none;margin-top:16px">
+      <div class="gc" style="padding:16px 18px">
+        <div style="font-size:.82rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">📊 Comparar presupuestos de proveedores</div>
+        <div style="font-size:.78rem;color:var(--text3);line-height:1.5;margin-bottom:12px">
+          Subí hasta <b>10 Excel</b> (uno por proveedor, cada uno con su propio formato) y compará precio por
+          insumo, emparejando por nombre con tolerancia ajustable. Solo compara — <b>no guarda ni modifica nada</b> del sistema.
+        </div>
+        <button class="btn btn-primary" onclick="openComparador()"><span class="btn-icon">📊</span> Comparar presupuestos</button>
+      </div>
+    </div>
   </div>
 
   <!-- ════ COSTOS ════ -->
@@ -1975,6 +1987,18 @@
       <button class="modal-close-btn" onclick="closePriceImport()">✕</button>
     </div>
     <div id="piBody"></div>
+  </div>
+</div>
+
+<!-- ─── Modal Comparador de presupuestos de proveedores ─────────────── -->
+<div class="modal-overlay" id="comparadorModal" onclick="closeComparador(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="max-width:900px">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="modal-title">📊 Comparar presupuestos de proveedores</div>
+      <button class="modal-close-btn" onclick="closeComparador()">✕</button>
+    </div>
+    <div id="cpBody"></div>
   </div>
 </div>
 
@@ -2374,7 +2398,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.0";
+const APP_VERSION = "6.1";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -3999,6 +4023,246 @@ async function _piApply(){
   }finally{ if(btn) btn.disabled=false; }
 }
 
+// ═══ Comparador de presupuestos de proveedores (Excel) ═════════════════════
+// Compara precios entre hasta 10 proveedores subiendo un Excel por cada uno
+// (las columnas pueden variar por archivo — no hay plantilla fija). Empareja
+// ítems ENTRE archivos por similitud de nombre (no contra el catálogo interno).
+// Herramienta de trabajo pura: NO escribe en Firestore ni modifica
+// supplies/stock/movimientos/historial. Todo el estado vive en memoria y se
+// pierde al cerrar el modal.
+let _cpProveedores=[], _cpStage='setup', _cpThreshold=0.95, _cpNextId=1;
+
+function openComparador(){
+  _cpProveedores=[]; _cpStage='setup'; _cpThreshold=0.95; _cpNextId=1;
+  document.getElementById('comparadorModal').classList.add('open');
+  _cpAddProveedor(); _cpAddProveedor();
+}
+function closeComparador(ev){
+  if(ev&&ev.target!==ev.currentTarget) return;
+  document.getElementById('comparadorModal').classList.remove('open');
+}
+function _cpAddProveedor(){
+  if(_cpProveedores.length>=10){ toast('⚠️ Máximo 10 proveedores'); return; }
+  _cpProveedores.push({id:'cp'+(_cpNextId++), nombre:'', fileName:'', raw:null, cols:null, rows:null});
+  _cpRenderStage(_cpStage);
+}
+function _cpRemoveProveedor(id){
+  _cpProveedores=_cpProveedores.filter(p=>p.id!==id);
+  _cpRenderStage(_cpStage);
+}
+function _cpSetNombre(id,v){
+  const p=_cpProveedores.find(x=>x.id===id); if(p) p.nombre=v;
+}
+
+// Detecta columna de nombre (más texto) y de precio (más numérica) — versión
+// parametrizada de _piAutoDetectCols para poder tener varios archivos a la vez.
+function _cpAutoDetectCols(rows){
+  const ncols=Math.max.apply(null, rows.map(r=>r.length));
+  const scoreRows=rows.slice(rows.length>1?1:0);
+  let nameCol=0, priceCol=ncols>1?1:0, bestText=-1, bestNum=-1;
+  for(let c=0;c<ncols;c++){
+    let textLen=0, numCount=0;
+    scoreRows.forEach(r=>{
+      const raw=r[c]; const sv=String(raw==null?'':raw).trim(); if(!sv) return;
+      const isNum=_piParsePrice(raw)!=null && sv.replace(/[0-9.,$\s-]/g,'').length===0;
+      if(isNum) numCount++; else textLen+=sv.length;
+    });
+    if(textLen>bestText){ bestText=textLen; nameCol=c; }
+    if(numCount>bestNum){ bestNum=numCount; priceCol=c; }
+  }
+  if(priceCol===nameCol && ncols>1){ priceCol=(nameCol+1)%ncols; }
+  const first=rows[0]||[];
+  const looksHeader=first.some(c=>/precio|producto|descrip|articulo|art\.|nombre|detalle|unitario|importe|lista/i.test(String(c)));
+  return {name:nameCol, price:priceCol, header:looksHeader?1:0, ncols};
+}
+function _cpBuildRows(raw,cols){
+  if(!raw||!cols) return [];
+  const src=raw.slice(cols.header);
+  const out=[];
+  src.forEach(r=>{
+    const nm=String(r[cols.name]==null?'':r[cols.name]).trim();
+    const pr=_piParsePrice(r[cols.price]);
+    if(nm && /[a-zA-Z]/.test(nm) && pr!=null) out.push({name:nm, price:pr});
+  });
+  return out;
+}
+async function _cpOnFile(id,input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const prov=_cpProveedores.find(p=>p.id===id); if(!prov) return;
+  const status=document.getElementById('cpStatus-'+id);
+  try{
+    if(status) status.textContent='Leyendo Excel…';
+    await _piLoadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    if(typeof XLSX==='undefined') throw new Error('No se pudo iniciar el lector de Excel');
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const raw=aoa.filter(r=>Array.isArray(r)&&r.some(c=>String(c).trim()!==''));
+    if(!raw.length){ toast('⚠️ El Excel de '+(prov.nombre||'este proveedor')+' está vacío'); if(status) status.textContent=''; return; }
+    prov.fileName=file.name;
+    prov.raw=raw;
+    prov.cols=_cpAutoDetectCols(raw);
+    prov.rows=_cpBuildRows(prov.raw,prov.cols);
+    if(status) status.textContent='';
+  }catch(e){
+    console.error(e); toast('⚠️ '+(e.message||'No se pudo leer el archivo'));
+    if(status) status.textContent='';
+  }
+  try{ input.value=''; }catch(e){}
+  _cpRenderStage(_cpStage);
+}
+function _cpColChange(id,field,val){
+  const p=_cpProveedores.find(x=>x.id===id); if(!p) return;
+  p.cols=Object.assign({},p.cols); p.cols[field]=parseInt(val)||0;
+  p.rows=_cpBuildRows(p.raw,p.cols);
+  _cpRenderStage('mapping');
+}
+function _cpThLabelOnly(v){ const l=document.getElementById('cpThLabel'); if(l) l.textContent=(parseInt(v)||95)+'%'; }
+function _cpSetThreshold(v){ _cpThreshold=(parseInt(v)||95)/100; }
+function _cpGoToMapping(){
+  const ready=_cpProveedores.filter(p=>p.rows&&p.rows.length);
+  if(ready.length<2){ toast('⚠️ Cargá al menos 2 proveedores con archivo'); return; }
+  _cpRenderStage('mapping');
+}
+function _cpCompute(){ _cpRenderStage('result'); }
+
+function _cpRenderStage(stage){
+  _cpStage=stage;
+  const body=document.getElementById('cpBody'); if(!body) return;
+  if(stage==='setup') body.innerHTML=_cpRenderSetup();
+  else if(stage==='mapping') body.innerHTML=_cpRenderMapping();
+  else if(stage==='result') body.innerHTML=_cpRenderResult();
+}
+function _cpRenderSetup(){
+  const rows=_cpProveedores.map(p=>{
+    return '<div class="gc" style="padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<input class="modal-input" style="flex:1;min-width:140px" placeholder="Nombre del proveedor" value="'+escAttr(p.nombre)+'" oninput="_cpSetNombre(\''+p.id+'\',this.value)">'+
+      '<input type="file" accept=".xlsx,.xls,.csv" id="cpFile-'+p.id+'" onchange="_cpOnFile(\''+p.id+'\',this)">'+
+      '<span id="cpStatus-'+p.id+'" style="font-size:.72rem;color:var(--text3)"></span>'+
+      (p.rows ? '<span style="font-size:.72rem;color:#22c55e">✓ '+p.rows.length+' ítem(s) — '+escHtml(p.fileName)+'</span>' : '')+
+      '<button class="modal-close-btn" onclick="_cpRemoveProveedor(\''+p.id+'\')" title="Quitar">✕</button>'+
+    '</div>';
+  }).join('');
+  const canAdd=_cpProveedores.length<10;
+  const readyCount=_cpProveedores.filter(p=>p.rows&&p.rows.length).length;
+  return rows+
+    '<button class="fmt-pill"'+(canAdd?'':' disabled')+' onclick="_cpAddProveedor()">➕ Agregar proveedor ('+_cpProveedores.length+'/10)</button>'+
+    '<div style="margin-top:16px;display:flex;justify-content:flex-end">'+
+      '<button class="btn btn-primary"'+(readyCount>=2?'':' disabled')+' onclick="_cpGoToMapping()">Siguiente: revisar columnas →</button>'+
+    '</div>'+
+    (readyCount<2?'<div style="font-size:.72rem;color:var(--text3);margin-top:6px">Cargá al menos 2 proveedores con archivo para poder comparar.</div>':'');
+}
+function _cpRenderMapping(){
+  const ready=_cpProveedores.filter(p=>p.raw);
+  const thPct=Math.round(_cpThreshold*100);
+  const rows=ready.map(p=>{
+    const header=p.raw[0]||[];
+    const opts=sel=>{
+      let out='';
+      for(let c=0;c<p.cols.ncols;c++){
+        const label=(header[c]!=null&&String(header[c]).trim()!=='')?String(header[c]):('Columna '+(c+1));
+        out+='<option value="'+c+'"'+(c===sel?' selected':'')+'>'+escHtml(label)+'</option>';
+      }
+      return out;
+    };
+    return '<div class="gc" style="padding:12px 14px;margin-bottom:10px">'+
+      '<div style="font-weight:700;margin-bottom:8px">'+escHtml(p.nombre||p.fileName)+' <span style="font-weight:400;color:var(--text3);font-size:.74rem">('+p.rows.length+' ítem(s) detectados)</span></div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<div><label style="font-size:.72rem;color:var(--text3)">Columna de nombre</label><br>'+
+        '<select class="modal-input" onchange="_cpColChange(\''+p.id+'\',\'name\',this.value)">'+opts(p.cols.name)+'</select></div>'+
+        '<div><label style="font-size:.72rem;color:var(--text3)">Columna de precio</label><br>'+
+        '<select class="modal-input" onchange="_cpColChange(\''+p.id+'\',\'price\',this.value)">'+opts(p.cols.price)+'</select></div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  return rows+
+    '<div class="gc" style="padding:12px 14px;margin-top:6px">'+
+      '<label style="font-size:.78rem;color:var(--text2)">Tolerancia de coincidencia entre insumos: <b id="cpThLabel">'+thPct+'%</b></label><br>'+
+      '<input type="range" min="70" max="100" value="'+thPct+'" style="width:100%" oninput="_cpThLabelOnly(this.value)" onchange="_cpSetThreshold(this.value)">'+
+      '<div style="font-size:.7rem;color:var(--text3)">Más alto = solo empareja nombres casi idénticos entre proveedores. Más bajo = agrupa nombres más distintos entre sí.</div>'+
+    '</div>'+
+    '<div style="margin-top:16px;display:flex;justify-content:space-between">'+
+      '<button class="btn" onclick="_cpRenderStage(\'setup\')">← Volver</button>'+
+      '<button class="btn btn-primary" onclick="_cpCompute()">Ver comparación →</button>'+
+    '</div>';
+}
+// Clustering incremental: los ítems del primer proveedor son semillas; cada
+// ítem de los proveedores siguientes se suma al cluster más parecido si supera
+// el umbral, o crea uno nuevo si no. No compara contra el catálogo (supplies).
+function _cpBuildClusters(){
+  const ready=_cpProveedores.filter(p=>p.rows&&p.rows.length);
+  const clusters=[];
+  ready.forEach(p=>{
+    p.rows.forEach(row=>{
+      const norm=_impNorm(row.name);
+      let best=null, bestScore=0;
+      clusters.forEach(c=>{
+        const sc=_impSim(norm,c.norm);
+        if(sc>bestScore){ bestScore=sc; best=c; }
+      });
+      if(best && bestScore>=_cpThreshold){
+        best.precios[p.id]=row.price;
+      } else {
+        const nc={rep:row.name, norm:norm, precios:{}};
+        nc.precios[p.id]=row.price;
+        clusters.push(nc);
+      }
+    });
+  });
+  return {clusters,proveedores:ready};
+}
+function _cpRenderResult(){
+  const built=_cpBuildClusters();
+  const clusters=built.clusters, provs=built.proveedores;
+  if(!clusters.length){
+    return '<div style="padding:20px;text-align:center;color:var(--text3)">No se detectaron ítems para comparar.</div>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="_cpRenderStage(\'mapping\')">← Volver</button></div>';
+  }
+  const summary=provs.map(p=>{
+    let count=0, total=0, wins=0;
+    clusters.forEach(c=>{
+      if(p.id in c.precios){
+        count++; total+=c.precios[p.id];
+        const vals=provs.map(q=>c.precios[q.id]).filter(v=>v!=null);
+        const min=Math.min.apply(null,vals);
+        if(c.precios[p.id]===min) wins++;
+      }
+    });
+    return {p,count,total,wins};
+  });
+  const summaryHtml='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+    summary.map(s=>{
+      return '<div class="gc" style="padding:10px 14px;flex:1;min-width:150px">'+
+        '<div style="font-weight:700;font-size:.82rem">'+escHtml(s.p.nombre||s.p.fileName)+'</div>'+
+        '<div style="font-size:.72rem;color:var(--text3)">'+s.count+' ítem(s) cotizados</div>'+
+        '<div style="font-size:.72rem;color:var(--text3)">Subtotal: $'+s.total.toLocaleString('es-AR',{minimumFractionDigits:2})+'</div>'+
+        '<div style="font-size:.72rem;color:#22c55e">Más barato en '+s.wins+' ítem(s)</div>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+  const head='<tr><th style="text-align:left">Insumo</th>'+provs.map(p=>'<th>'+escHtml(p.nombre||p.fileName)+'</th>').join('')+'</tr>';
+  const body=clusters.map(c=>{
+    const vals=provs.map(p=>c.precios[p.id]).filter(v=>v!=null);
+    const min=vals.length?Math.min.apply(null,vals):null;
+    const cells=provs.map(p=>{
+      const v=c.precios[p.id];
+      if(v==null) return '<td style="text-align:center;color:var(--text3)">—</td>';
+      const isMin=min!=null&&v===min;
+      return '<td style="text-align:center'+(isMin?';background:rgba(34,197,94,.15);font-weight:700;color:#22c55e':'')+'">$'+v.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';
+    }).join('');
+    return '<tr><td>'+escHtml(c.rep)+'</td>'+cells+'</tr>';
+  }).join('');
+  return summaryHtml+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem">'+
+      '<thead>'+head+'</thead><tbody>'+body+'</tbody>'+
+    '</table></div>'+
+    '<div style="margin-top:16px;display:flex;justify-content:space-between">'+
+      '<button class="btn" onclick="_cpRenderStage(\'mapping\')">← Volver a columnas</button>'+
+      '<button class="btn" onclick="closeComparador()">Cerrar</button>'+
+    '</div>';
+}
+
 
 // ─── Historial de precios: registro con fecha, origen y proveedor ─────────────
 const PRICE_HIST_MAX = 60;
@@ -5054,6 +5318,7 @@ function showApp(){
   // Herramienta de corrección: disponible para todos los usuarios autorizados
   const _impSec=document.getElementById("importToolSection"); if(_impSec) _impSec.style.display="block";
   const _piSec=document.getElementById("priceImportSection"); if(_piSec) _piSec.style.display="block";
+  const _cpSec=document.getElementById("comparadorSection"); if(_cpSec) _cpSec.style.display="block";
   if(isAdmin){
     document.getElementById("adminSection").style.display="block";
     document.getElementById("backupAdminSection").style.display="block";

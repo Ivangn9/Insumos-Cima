@@ -24,6 +24,16 @@ App de venta de comida, sin relación con CIMA. Convive en este repo pero es un 
 - `firestore.rules`: copia de referencia — el archivo real se pega manualmente en Firebase Console → Firestore → Reglas. Cubre ambas apps de este repo (y también las colecciones de MedTrack, porque es la misma base). Si se edita acá, recordar pegar el cambio en la consola.
 - Deploy de Functions: workflow `.github/workflows/deploy-functions.yml`, dispara con push a `main` que toque `functions/**`, `firebase.json` o `.firebaserc`. Requiere el secret `FIREBASE_SERVICE_ACCOUNT` configurado en este repo (Settings → Secrets → Actions).
 
+## Versiones — `stock-insumos.html`
+
+- `const APP_VERSION` (en `stock-insumos.html`) debe coincidir SIEMPRE con la misma constante en `firebase-messaging-sw.js` — el propio service worker lo indica ("Auto-update: keep this in sync"). Si no coinciden, el aviso de nueva versión no se detecta correctamente.
+- Formato `MAJOR.MINOR` (sin PATCH). Bump manual (no hay script tipo `tools/bump.js` acá todavía): patch/fix menores no requieren bump; una feature nueva sube MINOR (ej. `6.0`→`6.1`); un cambio estructural grande sube MAJOR y resetea MINOR a 0.
+- No hay changelog embebido (a diferencia de MedTrack) — no hace falta tocar nada más allá de las dos constantes.
+
+## Features — Comparador de presupuestos de proveedores
+
+Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.
+
 ## Deploy — GitHub Pages
 
 Cada push a `main` dispara "Deploy to GitHub Pages" (`.github/workflows/deploy.yml`), igual que en `medtrack`. Los cambios no se ven en `ivangn9.github.io/Insumos-Cima/` hasta que el workflow termina en verde.
