@@ -12,6 +12,20 @@ rules_version = '2';
 // por defecto) necesita LEER solicitudes_log/items para armar el badge y las
 // listas; antes solo isTeam() podía leer, así que a un usuario anónimo le
 // daba permission-denied en silencio y el visor quedaba siempre vacío.
+// v4 — FIX DE SEGURIDAD (auditoría 2026-07-29): isTeam() solo exigía "cuenta
+// de Google real, no anónima" — cualquiera podía crear una cuenta nueva desde
+// la consola del navegador (auto-registro habilitado) y quedar con lectura Y
+// ESCRITURA completas sobre todos los datos de MedTrack (orgs/cima/app/*),
+// sin importar si su email estaba en la lista de "Control de Acceso"
+// (config/access), porque esa lista nunca se consultaba desde las reglas.
+// Se agrega isAuthorizedMedTrack(), que además de isTeam() exige que el email
+// esté en config/access.emails, y se aplica a TODAS las rutas de MedTrack.
+// No se toca isTeam() en sí (lo siguen usando las rutas de Stock de Insumos,
+// que tienen su propio mecanismo de autorización aparte).
+// v5 — Mismo fix de seguridad aplicado a Stock de Insumos: isAuthorizedInsumos()
+// exige pertenecer a insumos_users (antes solo isTeam(), mismo hueco que
+// MedTrack). Confirmado con cuenta de prueba real antes del fix: se podía
+// leer el catálogo completo con precios sin estar autorizado.
 // ═══════════════════════════════════════════════════════════════
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -24,6 +38,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isTeam() && request.auth.token.email == 'ivangarcian@gmail.com';
+    }
+
+    // Exige además que el email esté en la lista de acceso de MedTrack
+    // (config/access.emails). Los emails se guardan siempre en minúsculas
+    // (ver addAccessEmail() en index.html) — se compara en minúsculas por
+    // las dudas de mayúsculas al iniciar sesión con Google.
+    function isAuthorizedMedTrack() {
+      return isTeam()
+        && request.auth.token.email.lower()
+             in get(/databases/$(database)/documents/config/access).data.emails;
     }
 
     // Valida la forma del pedido creado por el formulario público (anónimo):
@@ -39,26 +63,39 @@ service cloud.firestore {
     // ── MedTrack ──
     match /orgs/cima/app/public {
       // Espejo público de los QR: cualquiera autenticado (incluye anónimo) lee.
-      // Solo el equipo escribe.
+      // Solo el equipo AUTORIZADO escribe.
       allow read: if request.auth != null;
-      allow write: if isTeam();
+      allow write: if isAuthorizedMedTrack();
     }
 
     match /orgs/cima/app/{doc} {
       // data + hist_eqs + hist_antenas + hist_ots (historiales sharded):
-      // SOLO para el equipo. Los QR (login anónimo) NO pueden leerlos.
-      allow read, write: if isTeam();
+      // SOLO para el equipo AUTORIZADO. Los QR (login anónimo) NO pueden leerlos.
+      allow read, write: if isAuthorizedMedTrack();
     }
 
     match /orgs/cima/backups/{doc} {
-      allow read, write: if isTeam();
+      allow read, write: if isAuthorizedMedTrack();
     }
 
     match /orgs/cima/audit/{entry} {
       // Historial de auditoría permanente: el equipo lee; solo se agrega, no se edita ni borra.
-      allow read: if isTeam();
-      allow create: if isTeam();
+      allow read: if isAuthorizedMedTrack();
+      allow create: if isAuthorizedMedTrack();
       allow update, delete: if false;
+    }
+
+    // Lista de acceso de MedTrack ("Control de Acceso" en la app). Cualquier
+    // cuenta del equipo puede leerla (necesario para checkAccess() al iniciar
+    // sesión) y crearla la primera vez (bootstrap: el primer usuario se hace
+    // owner, igual que ya hace checkAccess() en index.html). Una vez creada,
+    // solo alguien YA autorizado puede agregar/quitar emails — nunca se borra
+    // el doc entero (evita perder la lista de acceso por accidente).
+    match /config/access {
+      allow read: if isTeam();
+      allow create: if isTeam() && !exists(/databases/$(database)/documents/config/access);
+      allow update: if isAuthorizedMedTrack();
+      allow delete: if false;
     }
 
     // Migración legacy (docs personales viejos)
@@ -67,31 +104,47 @@ service cloud.firestore {
     }
 
     // ── Stock de Insumos ──
+    // FIX DE SEGURIDAD (2026-07-29, mismo hallazgo que MedTrack): insumos_users
+    // ya existe como colección keyed-por-email (chequeada del lado del cliente
+    // en _checkUserAccess()), pero antes NINGUNA regla exigía pertenecer a ella
+    // para acceder a insumos_cima/* — bastaba isTeam(). Cualquier cuenta de
+    // Google/email nueva podía leer/escribir todo el catálogo, precios,
+    // movimientos. Se agrega isAuthorizedInsumos(), que exige además que el
+    // doc insumos_users/<email en minúsculas> exista.
+    function isAuthorizedInsumos() {
+      return isTeam()
+        && exists(/databases/$(database)/documents/insumos_users/$(request.auth.token.email.lower()));
+    }
+
     // Catálogo: el formulario público "Pedido de Insumos" (login anónimo)
-    // necesita LEERLO para armar el pedido. Solo el equipo lo escribe.
+    // necesita LEERLO para armar el pedido — la lectura sigue abierta a
+    // cualquier autenticado a propósito. Solo el equipo AUTORIZADO lo escribe.
     match /insumos_cima/supplies {
       allow read: if request.auth != null;
-      allow write: if isTeam();
+      allow write: if isAuthorizedInsumos();
     }
 
     // Pedidos enviados desde el formulario público: cualquiera autenticado
     // (incluye anónimo) puede CREAR un pedido y LEER la lista (para el visor
     // de Pendientes/Entregados — transparencia global, ver commit del
-    // visor). Marcar como entregado o borrar sigue siendo solo del equipo.
+    // visor) — esto sigue abierto a propósito. Marcar como entregado o
+    // borrar sigue siendo solo del equipo AUTORIZADO.
     match /insumos_cima/solicitudes_log/items/{item} {
       allow create: if request.auth != null && isValidSolicitud(request.resource.data);
       allow read: if request.auth != null;
-      allow update, delete: if isTeam();
+      allow update, delete: if isAuthorizedInsumos();
     }
 
     // Resto de Stock de Insumos (center_GN, center_Sarmiento, push_tokens,
-    // practicas_config, practicas_mes, entregas, …): solo el equipo.
+    // practicas_config, practicas_mes, entregas, …): solo el equipo autorizado.
     match /insumos_cima/{doc=**} {
-      allow read, write: if isTeam();
+      allow read, write: if isAuthorizedInsumos();
     }
 
-    // Usuarios autorizados del Stock: el equipo lee (chequeo de acceso al
-    // iniciar sesión); solo el admin agrega o quita usuarios.
+    // Usuarios autorizados del Stock: cualquier cuenta del equipo puede LEER
+    // la lista (es el propio chequeo de acceso al iniciar sesión — no puede
+    // exigir isAuthorizedInsumos() acá, sería circular). Solo el admin
+    // agrega o quita usuarios (esto ya estaba bien, no se toca).
     match /insumos_users/{email} {
       allow read: if isTeam();
       allow write: if isAdmin();
@@ -99,13 +152,13 @@ service cloud.firestore {
 
     // Respaldos diarios del Stock
     match /cima_backups/{doc} {
-      allow read, write: if isTeam();
+      allow read, write: if isAuthorizedInsumos();
     }
 
     // Auditoría del Stock: solo se agrega, no se edita ni borra.
     match /cima_audit/{entry} {
-      allow read: if isTeam();
-      allow create: if isTeam();
+      allow read: if isAuthorizedInsumos();
+      allow create: if isAuthorizedInsumos();
       allow update, delete: if false;
     }
 
