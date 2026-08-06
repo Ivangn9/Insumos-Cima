@@ -2875,13 +2875,6 @@ const curStock=()=>(activeCenter?cs[activeCenter].stock:{});
 const curMov=()=>(activeCenter?cs[activeCenter].movements:[]);
 
 // ─── Center ──────────────────────────────────────────────────────────────────
-function switchCenter(c){
-  activeCenter=c;
-  document.querySelectorAll(".center-btn").forEach(b=>b.classList.toggle("active",b.dataset.center===c));
-  updateCenterStats();
-  renderCurrentTab();
-}
-
 function updateCenterStats(){
   CENTERS.forEach(c=>{
     const stk=cs[c].stock;
@@ -3307,7 +3300,6 @@ function renderGestion(){
   });
   if(!el.children.length)el.innerHTML=`<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
 }
-function updatePrice(id,val){const s=supplies.find(x=>x.id===id);if(s){s.price=parseFloat(val)||0;persist();toast("Precio actualizado");}}
 
 // ─── Formatos de pedido ────────────────────────────────────────────────────────
 // Controla qué formatos (Unidad / Caja / Pack) aparecen en la app de Pedidos
@@ -5215,6 +5207,7 @@ function toast(msg){const c=document.getElementById("toastContainer");const t=do
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function escAttr(s){return escHtml(s).replace(/'/g,"&#39;");}
+function escJs(s){return escHtml(String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'"));}
 // Insumos con name vacío en Firestore (dato viejo/corrupto, no reproducible desde
 // la UI actual — ver saveSupply/saveEditSupply, que validan nombre no vacío) no
 // deben renderizar una <div class="li-name"></div> vacía: sin contenido, el div
@@ -5244,11 +5237,22 @@ function _daysLeft(fechaVenc){
 function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supplies.filter(s=>s.active&&!fc.includes(s.category)).map(s=>s.category))];return[...fc,...cu];}
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
+// App instalada (Agregar al Dock/pantalla de inicio): el popup de Google se
+// escapa a una ventana de Safari/Chrome normal y nunca devuelve el resultado
+// a la ventana standalone aislada — hay que ir directo a signInWithRedirect,
+// no esperar a que el popup falle con un código de error reconocible.
+function _isStandalonePWA(){
+  return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+}
 function signIn(){
   const p=new firebase.auth.GoogleAuthProvider();
   p.setCustomParameters({ prompt:'select_account' });
   const btn=document.getElementById('loginBtn');
   if(btn) btn.disabled=true;
+  if(_isStandalonePWA()){
+    try{ _auth.signInWithRedirect(p); return; }
+    catch(err){ if(btn) btn.disabled=false; toast('⚠️ No se pudo abrir el login de Google: '+(err.message||err)); return; }
+  }
   _auth.signInWithPopup(p).catch(function(e){
     const code=(e&&e.code)||'';
     // En Windows/escritorio el popup suele bloquearse o no poder comunicar la respuesta.
@@ -5312,7 +5316,7 @@ function showApp(){
   if('clearAppBadge' in navigator) navigator.clearAppBadge().catch(()=>{});
   if(navigator.serviceWorker?.controller) navigator.serviceWorker.controller.postMessage('clearBadge');
   // Diagnóstico standalone (solo visible en consola)
-  const _standalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+  const _standalone=_isStandalonePWA();
   console.log('[PWA] Modo standalone:',_standalone,'| SW soporte:',('serviceWorker' in navigator),'| Notif soporte:',('Notification' in window));
   if(!_standalone) console.warn('[PWA] La app NO está en modo standalone. Abrila desde el ícono de pantalla de inicio, no desde Safari.');
   // Herramienta de corrección: disponible para todos los usuarios autorizados
@@ -7214,7 +7218,7 @@ function renderEntregasHistorial(){
           <div class="entregas-hist-lic">👤 ${escHtml(h.licenciado||"—")}</div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
-          ${h.pdfBase64?`<button class="btn-pdf" onclick="openEntregaPdf('${escAttr(h.id)}','${escAttr(h.pdfNombre||"documento.pdf")}')">PDF</button>`:""}
+          ${h.pdfBase64?`<button class="btn-pdf" onclick="openEntregaPdf('${escAttr(h.id)}','${escJs(h.pdfNombre||"documento.pdf")}')">PDF</button>`:""}
           <button class="btn-del-entrega" onclick="deleteEntrega('${escAttr(h.id)}')">&#128465;</button>
         </div>
       </div>
@@ -7462,7 +7466,7 @@ function renderPracCostos(el){
         <div class="prac-insumo-consumo">×${it.consumo<1?it.consumo.toFixed(3).replace(/0+$/,'').replace(/\.$/,''):it.consumo} ud</div>
         <div class="prac-insumo-cost">${it.precio>0?_pracFmt(it.costo):'—'}</div>
         <button class="prac-link-btn ${isLinked?'linked':'unlinked'}" title="${escAttr(btnTitle)}"
-          onclick="openPracLink('${escAttr(it.oKey)}','${escAttr(it.nombre)}')">${btnIcon}</button>
+          onclick="openPracLink('${escAttr(it.oKey)}','${escJs(it.nombre)}')">${btnIcon}</button>
       </div>`;
     }).join('');
     return `<div class="prac-card">
