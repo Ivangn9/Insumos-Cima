@@ -2,6 +2,40 @@ const functions = require("firebase-functions");
 const admin     = require("firebase-admin");
 admin.initializeApp();
 
+const ADMIN_EMAIL = "ivangarcian@gmail.com";
+
+// Crea o resetea la contraseña de acceso de un usuario de Stock de Insumos.
+// Solo lo puede llamar el admin — el SDK cliente de Firebase Auth únicamente
+// puede cambiar la contraseña de LA SESIÓN YA LOGUEADA (self-service), nunca
+// la de otra cuenta; para que el admin "genere" acceso a otra persona hace
+// falta el SDK de Admin, que solo puede correr acá (nunca en el navegador).
+// No toca insumos_users/{email} (la lista de autorización) — eso lo sigue
+// manejando el cliente directo contra Firestore, como siempre.
+exports.adminSetPassword = functions.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.email !== ADMIN_EMAIL) {
+    throw new functions.https.HttpsError("permission-denied", "Solo el administrador puede crear o resetear contraseñas.");
+  }
+  const email    = String((data && data.email) || "").trim().toLowerCase();
+  const password = String((data && data.password) || "");
+  if (!email || !email.includes("@")) {
+    throw new functions.https.HttpsError("invalid-argument", "Email inválido.");
+  }
+  if (password.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "La contraseña debe tener al menos 6 caracteres.");
+  }
+  try {
+    const existing = await admin.auth().getUserByEmail(email).catch(() => null);
+    if (existing) {
+      await admin.auth().updateUser(existing.uid, { password });
+      return { ok: true, created: false };
+    }
+    await admin.auth().createUser({ email, password, emailVerified: true });
+    return { ok: true, created: true };
+  } catch (e) {
+    throw new functions.https.HttpsError("internal", e.message || String(e));
+  }
+});
+
 exports.notifySolicitud = functions.firestore
   .document("insumos_cima/solicitudes_log/items/{itemId}")
   .onCreate(async (snap, context) => {

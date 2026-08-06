@@ -29,6 +29,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
   <!-- Chart.js y jsPDF se usan recién al renderizar gráficas/exportar — defer no bloquea el arranque -->
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1295,10 +1296,18 @@
     </div>
     <div class="login-title">Stock de Insumos</div>
     <div class="login-sub">CIMA · Acceso exclusivo para personal autorizado</div>
-    <button class="btn-google" id="loginBtn" onclick="signIn()">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
-      Iniciar sesión con Google
+    <div class="ff" style="text-align:left;margin-bottom:10px">
+      <input type="email" id="loginEmail" class="modal-input" placeholder="Email" autocomplete="username"
+        onkeydown="if(event.key==='Enter') document.getElementById('loginPass').focus()" />
+    </div>
+    <div class="ff" style="text-align:left;margin-bottom:6px">
+      <input type="password" id="loginPass" class="modal-input" placeholder="Contraseña" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') signIn()" />
+    </div>
+    <button class="btn-primary" id="loginBtn" onclick="signIn()" style="width:100%;margin-top:6px">
+      Iniciar sesión
     </button>
+    <div class="login-signout" style="margin-top:10px" onclick="sendPasswordReset()">¿Olvidaste tu contraseña?</div>
     <div class="unauthorized-msg" id="unauthorizedMsg">
       ⛔ Tu cuenta no está autorizada para acceder a este sistema.<br>Contactá al administrador para solicitar acceso.
     </div>
@@ -1391,6 +1400,7 @@
     <div class="sb-user">
       <span class="sb-user-name" id="sbUserName">—</span>
     </div>
+    <button class="sb-signout" style="color:var(--text2);margin-bottom:4px" onclick="openChangePasswordModal()">Cambiar mi contraseña</button>
     <button class="sb-signout" onclick="signOut()">Cerrar sesión</button>
   </div>
 </div>
@@ -1666,11 +1676,7 @@
     <!-- Sección admin (solo visible para administradores) -->
     <div class="admin-section" id="adminSection" style="display:none">
       <div class="admin-section-title">👥 Gestión de usuarios</div>
-      <div id="adminUserList"><p style="font-size:13px;color:var(--text-secondary)">Cargando usuarios…</p></div>
-      <div class="admin-add-row">
-        <input type="email" id="adminNewEmail" placeholder="Email del nuevo usuario…" />
-        <button class="btn btn-primary" onclick="addAuthorizedUser()" style="white-space:nowrap"><span class="btn-icon">+</span> Agregar</button>
-      </div>
+      <button class="btn btn-primary" onclick="openUsersModal()">Abrir gestión de usuarios</button>
     </div>
 
     <!-- ─ Respaldos (admin) ─ -->
@@ -1911,17 +1917,60 @@
       <button class="modal-close-btn" onclick="closeUsersModal()">✕</button>
     </div>
     <div id="usersModalList" style="margin-bottom:16px;max-height:280px;overflow-y:auto"></div>
-    <div class="admin-add-row">
+    <div class="admin-add-row" style="flex-wrap:wrap">
       <input type="email" id="usersNewEmail" placeholder="Email del nuevo usuario…" class="modal-input"
-        onkeydown="if(event.key==='Enter') addAuthorizedUser2()" autocomplete="off" />
+        style="flex:1 1 200px" autocomplete="off" />
+      <input type="text" id="usersNewPass" placeholder="Contraseña inicial (mín. 6)" class="modal-input"
+        style="flex:1 1 160px" onkeydown="if(event.key==='Enter') addAuthorizedUser2()" autocomplete="off" />
       <button id="usersAddBtn" class="btn btn-primary" onclick="addAuthorizedUser2()" style="white-space:nowrap;flex-shrink:0">
         <span>+ Agregar</span>
       </button>
     </div>
     <div id="usersModalMsg" style="font-size:.8rem;min-height:1.4em;margin-top:6px"></div>
     <p style="font-size:.72rem;color:var(--text3);margin-top:4px">
-      Los usuarios agregados pueden iniciar sesión con su cuenta de Google.
+      Los usuarios agregados entran con ese email y esa contraseña — la pueden cambiar después desde "Cambiar mi contraseña".
     </p>
+  </div>
+</div>
+
+<!-- ─── Modal Cambiar mi contraseña (self-service) ────── -->
+<div class="modal-overlay" id="changePasswordModal" onclick="closeChangePasswordModal(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div class="modal-title">🔑 Cambiar mi contraseña</div>
+      <button class="modal-close-btn" onclick="closeChangePasswordModal()">✕</button>
+    </div>
+    <div style="padding:0 2px">
+      <div class="ff"><div class="ff-label">Contraseña actual</div>
+        <input type="password" id="cpCurrent" class="modal-input" autocomplete="current-password"></div>
+      <div class="ff"><div class="ff-label">Contraseña nueva (mínimo 6 caracteres)</div>
+        <input type="password" id="cpNew1" class="modal-input" autocomplete="new-password"></div>
+      <div class="ff"><div class="ff-label">Repetir contraseña nueva</div>
+        <input type="password" id="cpNew2" class="modal-input" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter') confirmChangePassword()"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="confirmChangePassword()">Guardar</button>
+      <div id="cpMsg" style="font-size:.8rem;min-height:1.4em;margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal Resetear contraseña de otro usuario (Admin) ── -->
+<div class="modal-overlay" id="resetPassModal" onclick="closeResetPassModal(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div class="modal-title">🔑 Restablecer contraseña</div>
+      <button class="modal-close-btn" onclick="closeResetPassModal()">✕</button>
+    </div>
+    <div style="padding:0 2px">
+      <p style="font-size:.8rem;color:var(--text2);margin:0 0 14px" id="rpEmailLabel"></p>
+      <div class="ff"><div class="ff-label">Contraseña nueva (mínimo 6 caracteres)</div>
+        <input type="text" id="rpNew" class="modal-input" autocomplete="off"
+          onkeydown="if(event.key==='Enter') confirmResetPassword()"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="confirmResetPassword()">Guardar</button>
+      <div id="rpMsg" style="font-size:.8rem;min-height:1.4em;margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -2734,6 +2783,7 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const _auth = firebase.auth();
 const _db   = firebase.firestore();
+const _functions = firebase.functions();
 // Sesión persistente: el login queda guardado en el dispositivo hasta cerrar sesión
 _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 // Cache offline de Firestore: la app abre al instante con los últimos datos
@@ -5237,37 +5287,39 @@ function _daysLeft(fechaVenc){
 function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supplies.filter(s=>s.active&&!fc.includes(s.category)).map(s=>s.category))];return[...fc,...cu];}
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-// App instalada (Agregar al Dock/pantalla de inicio): el popup de Google se
-// escapa a una ventana de Safari/Chrome normal y nunca devuelve el resultado
-// a la ventana standalone aislada — hay que ir directo a signInWithRedirect,
-// no esperar a que el popup falle con un código de error reconocible.
+// Login por email/contraseña (Firebase Auth) — reemplaza el login con Google:
+// Google bloquea el flujo OAuth dentro de cualquier WebView embebido (Tauri,
+// apps "Agregar al Dock/pantalla de inicio", etc.) por política antiphishing
+// ("disallowed_useragent"), así que no es viable para la app nativa. El admin
+// autoriza emails en insumos_users (como siempre) y además crea/resetea la
+// contraseña de acceso desde "Gestión de usuarios" (ver adminSetPassword en
+// functions/index.js — el SDK cliente solo puede tocar la sesión propia).
 function _isStandalonePWA(){
   return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
 }
 function signIn(){
-  const p=new firebase.auth.GoogleAuthProvider();
-  p.setCustomParameters({ prompt:'select_account' });
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  const pass=document.getElementById('loginPass').value||'';
+  if(!email||!pass){ toast('⚠️ Completá email y contraseña'); return; }
   const btn=document.getElementById('loginBtn');
   if(btn) btn.disabled=true;
-  if(_isStandalonePWA()){
-    try{ _auth.signInWithRedirect(p); return; }
-    catch(err){ if(btn) btn.disabled=false; toast('⚠️ No se pudo abrir el login de Google: '+(err.message||err)); return; }
-  }
-  _auth.signInWithPopup(p).catch(function(e){
+  _auth.signInWithEmailAndPassword(email,pass).catch(function(e){
     const code=(e&&e.code)||'';
-    // En Windows/escritorio el popup suele bloquearse o no poder comunicar la respuesta.
-    // Caemos automáticamente al flujo por REDIRECCIÓN, que no depende de popups.
-    const useRedirect=[
-      'auth/popup-blocked','auth/popup-closed-by-user','auth/cancelled-popup-request',
-      'auth/operation-not-supported-in-this-environment','auth/network-request-failed',
-      'auth/internal-error','auth/web-storage-unsupported'
-    ].indexOf(code)>=0;
-    if(useRedirect){
-      try{ _auth.signInWithRedirect(p); return; }
-      catch(err){ if(btn) btn.disabled=false; toast('⚠️ No se pudo abrir el login de Google: '+(err.message||err)); return; }
-    }
-    if(btn) btn.disabled=false;
-    toast('⚠️ Error al iniciar sesión: '+(e.message||e));
+    const msg=code==='auth/user-not-found'||code==='auth/invalid-credential'?'⚠️ Email o contraseña incorrectos'
+      :code==='auth/wrong-password'?'⚠️ Contraseña incorrecta'
+      :code==='auth/invalid-email'?'⚠️ Email inválido'
+      :code==='auth/too-many-requests'?'⚠️ Demasiados intentos — probá de nuevo en unos minutos'
+      :'⚠️ Error al iniciar sesión: '+(e.message||code);
+    toast(msg);
+  }).finally(function(){ if(btn) btn.disabled=false; });
+}
+function sendPasswordReset(){
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  if(!email){ toast('⚠️ Escribí tu email arriba primero'); return; }
+  _auth.sendPasswordResetEmail(email).then(function(){
+    toast('✓ Si '+email+' tiene acceso, te llegó un email para restablecer la contraseña');
+  }).catch(function(e){
+    toast(e.code==='auth/invalid-email'?'⚠️ Email inválido':'⚠️ '+(e.message||e.code));
   });
 }
 function signOut(){
@@ -5471,13 +5523,6 @@ function startUsersListener(){
 
 // ─── Admin user management ────────────────────────────────────────────────────
 function renderAdminUsers(users){
-  // Legacy: keep adminUserList in gestion tab if present
-  const el=document.getElementById("adminUserList");
-  if(el){
-    if(!users.length){el.innerHTML='<p style="font-size:13px;color:var(--text-secondary)">No hay usuarios.</p>';}
-    else el.innerHTML=users.map(u=>`<div class="admin-user-row"><span class="admin-user-email">${escHtml(u.email)}</span><button class="btn-remove-user" onclick="removeUser('${escAttr(u.email)}')">Quitar</button></div>`).join("");
-  }
-  // New: render in users modal
   const mel=document.getElementById("usersModalList");
   if(!mel)return;
   if(!users.length){mel.innerHTML='<p style="text-align:center;color:var(--text3);font-size:.85rem;padding:20px">No hay usuarios autorizados aún.</p>';return;}
@@ -5485,6 +5530,7 @@ function renderAdminUsers(users){
     <div class="users-row">
       <span class="users-row-email">${escHtml(u.email)}</span>
       <span class="users-row-badge">${u.email===ADMIN_EMAIL?"Admin":"Usuario"}</span>
+      <button class="btn-remove-user" style="background:rgba(0,113,227,.10);color:#0071e3;border-color:rgba(0,113,227,.2)" onclick="openResetPassModal('${escJs(u.email)}')">Contraseña</button>
       ${u.email===ADMIN_EMAIL?"":"<button class=\"btn-remove-user\" onclick=\"removeUser('"+escAttr(u.email)+"')\" >Quitar</button>"}
     </div>
   `).join("");
@@ -5506,16 +5552,22 @@ function closeUsersModal(e){
 async function addAuthorizedUser2(){
   if(!isAdmin){toast("⚠️ Sin permisos");return;}
   const input=document.getElementById("usersNewEmail");
+  const passInput=document.getElementById("usersNewPass");
   const btn=document.getElementById("usersAddBtn");
   const msg=document.getElementById("usersModalMsg");
   const email=(input.value||"").trim().toLowerCase();
+  const pass=passInput.value||"";
   if(msg)msg.textContent="";
   if(!email||!email.includes("@")){if(msg){msg.style.color="var(--red)";msg.textContent="⚠️ Ingresá un email válido";}return;}
   if(email===ADMIN_EMAIL){if(msg){msg.style.color="var(--text3)";msg.textContent="ℹ️ Ese email ya es administrador";}return;}
+  if(pass.length<6){if(msg){msg.style.color="var(--red)";msg.textContent="⚠️ La contraseña debe tener al menos 6 caracteres";}return;}
   if(btn){btn.disabled=true;btn.textContent="Guardando…";}
   try{
+    // Primero la credencial de acceso (Cloud Function, requiere permisos de admin
+    // del lado del servidor) — recién si eso sale bien, se autoriza en Firestore.
+    await _functions.httpsCallable("adminSetPassword")({email,password:pass});
     await _db.collection(DB_USERS).doc(email).set({email,name:email,addedAt:new Date().toISOString(),addedBy:currentUser.email});
-    input.value="";
+    input.value=""; passInput.value="";
     if(msg){msg.style.color="var(--green,#22c55e)";msg.textContent="✓ Usuario agregado: "+email;}
     toast("✓ Usuario agregado: "+email);
   }catch(err){
@@ -5525,15 +5577,63 @@ async function addAuthorizedUser2(){
   if(btn){btn.disabled=false;btn.innerHTML="<span>+ Agregar</span>";}
 }
 
-async function addAuthorizedUser(){
+function openResetPassModal(email){
+  document.getElementById("rpEmailLabel").textContent="Nueva contraseña para "+email;
+  document.getElementById("resetPassModal").dataset.email=email;
+  document.getElementById("rpNew").value="";
+  document.getElementById("rpMsg").textContent="";
+  document.getElementById("resetPassModal").classList.add("open");
+}
+function closeResetPassModal(e){
+  if(e && e.target!==document.getElementById("resetPassModal")) return;
+  document.getElementById("resetPassModal").classList.remove("open");
+}
+async function confirmResetPassword(){
   if(!isAdmin){toast("⚠️ Sin permisos");return;}
-  const email=(document.getElementById("adminNewEmail").value||"").trim().toLowerCase();
-  if(!email||!email.includes("@")){toast("⚠️ Ingresá un email válido");return;}
+  const email=document.getElementById("resetPassModal").dataset.email;
+  const pass=document.getElementById("rpNew").value||"";
+  const msg=document.getElementById("rpMsg");
+  if(pass.length<6){msg.style.color="var(--red)";msg.textContent="⚠️ Mínimo 6 caracteres";return;}
   try{
-    await _db.collection(DB_USERS).doc(email).set({email,name:email,addedAt:new Date().toISOString(),addedBy:currentUser.email});
-    document.getElementById("adminNewEmail").value="";
-    toast("✓ Usuario agregado: "+email);
-  }catch(e){toast("⚠️ Error: "+e.message);}
+    await _functions.httpsCallable("adminSetPassword")({email,password:pass});
+    toast("✓ Contraseña actualizada para "+email);
+    closeResetPassModal();
+  }catch(err){
+    msg.style.color="var(--red)";msg.textContent="⚠️ "+(err.message||err);
+  }
+}
+
+function openChangePasswordModal(){
+  document.getElementById("cpCurrent").value="";
+  document.getElementById("cpNew1").value="";
+  document.getElementById("cpNew2").value="";
+  document.getElementById("cpMsg").textContent="";
+  document.getElementById("changePasswordModal").classList.add("open");
+  closeSidebar();
+}
+function closeChangePasswordModal(e){
+  if(e && e.target!==document.getElementById("changePasswordModal")) return;
+  document.getElementById("changePasswordModal").classList.remove("open");
+}
+async function confirmChangePassword(){
+  const cur=document.getElementById("cpCurrent").value||"";
+  const p1=document.getElementById("cpNew1").value||"";
+  const p2=document.getElementById("cpNew2").value||"";
+  const msg=document.getElementById("cpMsg");
+  if(!cur){msg.style.color="var(--red)";msg.textContent="⚠️ Ingresá tu contraseña actual";return;}
+  if(p1.length<6){msg.style.color="var(--red)";msg.textContent="⚠️ La contraseña nueva debe tener al menos 6 caracteres";return;}
+  if(p1!==p2){msg.style.color="var(--red)";msg.textContent="⚠️ Las contraseñas no coinciden";return;}
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(currentUser.email,cur);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updatePassword(p1);
+    toast("✓ Contraseña actualizada");
+    closeChangePasswordModal();
+  }catch(err){
+    const code=err&&err.code;
+    msg.style.color="var(--red)";
+    msg.textContent=code==="auth/wrong-password"?"⚠️ La contraseña actual no es correcta":"⚠️ "+(err.message||err);
+  }
 }
 
 async function removeUser(email){
@@ -5652,16 +5752,6 @@ async function _checkUserAccess(user, attempt, seq){
   }
 }
 
-// Completa el login por redirección (Windows/escritorio) y expone errores reales.
-_auth.getRedirectResult().catch(function(e){
-  const code=(e&&e.code)||'';
-  if(!code || code==='auth/no-auth-event') return;
-  if(code==='auth/unauthorized-domain'){
-    toast('⚠️ Dominio no autorizado en Firebase — avisale al administrador.');
-  } else {
-    toast('⚠️ Error de login: '+(e.message||e));
-  }
-});
 _auth.onAuthStateChanged(async user=>{
   _accessSeq++;
   if(!user){ showLogin(false); currentUser=null; isAdmin=false; return; }
