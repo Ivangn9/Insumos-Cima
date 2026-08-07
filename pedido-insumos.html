@@ -1663,15 +1663,6 @@ window.addEventListener("load", () => {
 // Chequeo automático cada 3 minutos
 setInterval(() => checkUpdate(false), 3 * 60 * 1000);
 
-// ─── Export PDF ──────────────────────────────────────────────────────────────
-function exportPDF() {
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    toast("Librería PDF no cargada · Recargá la página");
-    return;
-  }
-  try { _doExportPDF(); } catch(e) { toast("Error PDF: " + (e.message || String(e)).slice(0,50)); }
-}
-
 function _buildPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -1953,40 +1944,6 @@ function _buildPDF() {
 
   var fname = "Pedido_Insumos_" + fecha.replace(/-/g, "") + "_" + (solicitante.split(" ")[0] || "CIMA") + ".pdf";
   return { doc: doc, fname: fname };
-}
-
-function _doExportPDF() {
-  var result = _buildPDF();
-  var doc = result.doc, fname = result.fname;
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-  if (!isIOS) {
-    doc.save(fname);
-    toast("PDF exportado exitosamente ✓");
-    return;
-  }
-
-  const blob = doc.output("blob");
-  if (navigator.share && navigator.canShare) {
-    try {
-      const file = new File([blob], fname, { type: "application/pdf" });
-      if (navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: "Pedido de Insumos CIMA" })
-          .then(() => toast("PDF listo ✓"))
-          .catch(e => { if (e.name !== "AbortError") _iosFallback(doc, fname); });
-        return;
-      }
-    } catch (_) {}
-  }
-  _iosFallback(doc, fname);
-}
-
-function _iosFallback(doc, fname) {
-  // dataurlnewwindow usa un form POST para bypassear el bloqueador de popups
-  doc.output("dataurlnewwindow", { filename: fname });
-  toast("PDF abierto · Tocá ⎙ Compartir para guardarlo");
 }
 
 // ─── Supplies loader (Firestore) ─────────────────────────────────────────────

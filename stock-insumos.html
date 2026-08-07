@@ -5396,7 +5396,12 @@ try{
 
 function signIn(e){
   if(e&&e.preventDefault) e.preventDefault();
-  const email=(document.getElementById('loginEmail').value||'').trim();
+  // .toLowerCase() acá — es el único punto de todo el flujo de auth que no
+  // normalizaba (adminSetPassword, addAuthorizedUser2, _checkUserAccess,
+  // onAuthStateChanged y la regla de Firestore sí lo hacen todos) — un email
+  // con mayúsculas podía fallar el login aunque el admin lo haya creado en
+  // minúsculas.
+  const email=(document.getElementById('loginEmail').value||'').trim().toLowerCase();
   const pass=document.getElementById('loginPass').value||'';
   const remember=document.getElementById('loginRemember').checked;
   if(!email||!pass){ toast('⚠️ Completá email y contraseña'); return; }
