@@ -705,13 +705,45 @@
     }
     .btn-google:active { transform: scale(0.97); }
     .btn-google img { width: 20px; height: 20px; }
+    .login-fields {
+      text-align: left; margin-bottom: 16px; position: relative; z-index: 1;
+      background: rgba(255,255,255,.70);
+      border: 1px solid rgba(255,255,255,.85);
+      border-radius: var(--r-lg);
+      box-shadow: 0 1px 4px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.9);
+      overflow: hidden;
+    }
+    .login-fields input {
+      display: block; width: 100%; border: none; background: transparent; outline: none;
+      padding: 15px 16px; font-size: 15px; font-family: inherit; color: var(--text);
+      -webkit-appearance: none;
+    }
+    .login-fields input::placeholder { color: var(--text3); }
+    .login-field-divider { height: 1px; margin: 0 16px; background: rgba(60,60,67,.14); }
+    .btn-login {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; padding: 15px; border: none; border-radius: var(--r-pill);
+      background: linear-gradient(180deg, #2a97ff 0%, var(--accent) 55%, var(--accent2) 100%);
+      color: #fff; font-size: 16px; font-weight: 650; letter-spacing: -0.1px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 8px 20px rgba(0,113,227,.38), inset 0 1px 0 rgba(255,255,255,.35);
+      transition: transform 0.15s var(--spring), box-shadow 0.15s;
+      position: relative; z-index: 1;
+    }
+    .btn-login:active { transform: scale(0.97); box-shadow: 0 4px 12px rgba(0,113,227,.32), inset 0 1px 0 rgba(255,255,255,.3); }
+    .btn-login:disabled { opacity: .6; pointer-events: none; }
     .unauthorized-msg {
       margin-top: 18px; padding: 14px; border-radius: var(--r-md);
       background: rgba(255,59,48,.10); border: 1px solid rgba(255,59,48,.22);
       color: var(--red); font-size: 13px; font-weight: 580;
       display: none; position: relative; z-index: 1;
     }
-    .login-signout { margin-top: 12px; font-size: 12px; color: var(--text2); cursor: pointer; text-decoration: underline; position: relative; z-index: 1; }
+    .login-signout {
+      margin-top: 12px; font-size: 13px; font-weight: 590; color: var(--accent); cursor: pointer;
+      position: relative; z-index: 1; transition: opacity .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .login-signout:active { opacity: .55; }
 
     /* ─── User bar ───────────────────────────────────── */
     .user-bar {
@@ -1296,18 +1328,17 @@
     </div>
     <div class="login-title">Stock de Insumos</div>
     <div class="login-sub">CIMA · Acceso exclusivo para personal autorizado</div>
-    <div class="ff" style="text-align:left;margin-bottom:10px">
-      <input type="email" id="loginEmail" class="modal-input" placeholder="Email" autocomplete="username"
-        onkeydown="if(event.key==='Enter') document.getElementById('loginPass').focus()" />
-    </div>
-    <div class="ff" style="text-align:left;margin-bottom:6px">
-      <input type="password" id="loginPass" class="modal-input" placeholder="Contraseña" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter') signIn()" />
-    </div>
-    <button class="btn-primary" id="loginBtn" onclick="signIn()" style="width:100%;margin-top:6px">
-      Iniciar sesión
-    </button>
-    <div class="login-signout" style="margin-top:10px" onclick="sendPasswordReset()">¿Olvidaste tu contraseña?</div>
+    <form id="loginForm" autocomplete="on" onsubmit="signIn(event);return false;">
+      <div class="login-fields">
+        <input type="email" id="loginEmail" name="email" placeholder="Email"
+          autocomplete="username" required />
+        <div class="login-field-divider"></div>
+        <input type="password" id="loginPass" name="password" placeholder="Contraseña"
+          autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn-login" id="loginBtn">Iniciar sesión</button>
+    </form>
+    <div class="login-signout" style="margin-top:14px" onclick="sendPasswordReset()">¿Olvidaste tu contraseña?</div>
     <div class="unauthorized-msg" id="unauthorizedMsg">
       ⛔ Tu cuenta no está autorizada para acceder a este sistema.<br>Contactá al administrador para solicitar acceso.
     </div>
@@ -5297,7 +5328,8 @@ function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supp
 function _isStandalonePWA(){
   return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
 }
-function signIn(){
+function signIn(e){
+  if(e&&e.preventDefault) e.preventDefault();
   const email=(document.getElementById('loginEmail').value||'').trim();
   const pass=document.getElementById('loginPass').value||'';
   if(!email||!pass){ toast('⚠️ Completá email y contraseña'); return; }
