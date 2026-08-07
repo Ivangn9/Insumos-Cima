@@ -111,9 +111,17 @@ service cloud.firestore {
     // Google/email nueva podía leer/escribir todo el catálogo, precios,
     // movimientos. Se agrega isAuthorizedInsumos(), que exige además que el
     // doc insumos_users/<email en minúsculas> exista.
+    // FIX 2026-08-07: el admin (isAdmin()) nunca necesitó su propio doc en
+    // insumos_users porque el cliente lo dejaba entrar por atajo (ver
+    // onAuthStateChanged en stock-insumos.html) — pero esta regla no sabía
+    // nada de ese atajo y bloqueaba igual sus lecturas de center_GN/
+    // center_Sarmiento/etc con permission-denied. Recién se notó al migrar
+    // el login de Google a email/contraseña (sesión realmente nueva, sin
+    // caché offline tapando el error). isAdmin() ahora es una vía alternativa
+    // explícita, no depende de que exista el doc.
     function isAuthorizedInsumos() {
-      return isTeam()
-        && exists(/databases/$(database)/documents/insumos_users/$(request.auth.token.email.lower()));
+      return isAdmin() || (isTeam()
+        && exists(/databases/$(database)/documents/insumos_users/$(request.auth.token.email.lower())));
     }
 
     // Catálogo: el formulario público "Pedido de Insumos" (login anónimo)

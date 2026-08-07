@@ -720,6 +720,14 @@
     }
     .login-fields input::placeholder { color: var(--text3); }
     .login-field-divider { height: 1px; margin: 0 16px; background: rgba(60,60,67,.14); }
+    .login-remember {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+      font-size: 13.5px; color: var(--text2); cursor: pointer; user-select: none;
+      position: relative; z-index: 1;
+    }
+    .login-remember input[type="checkbox"] {
+      width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; margin: 0;
+    }
     .btn-login {
       display: flex; align-items: center; justify-content: center;
       width: 100%; padding: 15px; border: none; border-radius: var(--r-pill);
@@ -1336,6 +1344,10 @@
         <input type="password" id="loginPass" name="password" placeholder="Contraseña"
           autocomplete="current-password" required />
       </div>
+      <label class="login-remember">
+        <input type="checkbox" id="loginRemember" checked />
+        Recordar usuario y contraseña
+      </label>
       <button type="submit" class="btn-login" id="loginBtn">Iniciar sesión</button>
     </form>
     <div class="login-signout" style="margin-top:14px" onclick="sendPasswordReset()">¿Olvidaste tu contraseña?</div>
@@ -5328,14 +5340,36 @@ function getCategories(){const fc=Object.keys(CATALOG);const cu=[...new Set(supp
 function _isStandalonePWA(){
   return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
 }
+// Precarga el email guardado (si "Recordar" estaba tildado la última vez).
+// La contraseña NUNCA se guarda acá — eso queda en manos del gestor de
+// contraseñas real del navegador/SO (navigator.credentials.store más abajo).
+try{
+  const _savedEmail=localStorage.getItem('cima_stock_email');
+  if(_savedEmail){ const el=document.getElementById('loginEmail'); if(el) el.value=_savedEmail; }
+}catch(_e){}
+
 function signIn(e){
   if(e&&e.preventDefault) e.preventDefault();
   const email=(document.getElementById('loginEmail').value||'').trim();
   const pass=document.getElementById('loginPass').value||'';
+  const remember=document.getElementById('loginRemember').checked;
   if(!email||!pass){ toast('⚠️ Completá email y contraseña'); return; }
   const btn=document.getElementById('loginBtn');
   if(btn) btn.disabled=true;
-  _auth.signInWithEmailAndPassword(email,pass).catch(function(e){
+  _auth.signInWithEmailAndPassword(email,pass).then(function(){
+    try{
+      if(remember){
+        localStorage.setItem('cima_stock_email',email);
+        // Le pide al navegador que guarde la credencial en SU gestor de
+        // contraseñas (API estándar) — nunca la manejamos ni guardamos nosotros.
+        if(window.PasswordCredential&&navigator.credentials&&navigator.credentials.store){
+          navigator.credentials.store(new PasswordCredential({id:email,password:pass,name:email})).catch(function(){});
+        }
+      } else {
+        localStorage.removeItem('cima_stock_email');
+      }
+    }catch(_e){}
+  }).catch(function(e){
     const code=(e&&e.code)||'';
     const msg=code==='auth/user-not-found'||code==='auth/invalid-credential'?'⚠️ Email o contraseña incorrectos'
       :code==='auth/wrong-password'?'⚠️ Contraseña incorrecta'
@@ -5789,7 +5823,16 @@ _auth.onAuthStateChanged(async user=>{
   if(!user){ showLogin(false); currentUser=null; isAdmin=false; return; }
   const email=user.email.toLowerCase();
   currentUser=user;
-  if(email===ADMIN_EMAIL){ isAdmin=true; showApp(); startListeners(); initPushNotifications(); _handleNotifTabParam(); return; }
+  if(email===ADMIN_EMAIL){
+    isAdmin=true; showApp(); startListeners(); initPushNotifications(); _handleNotifTabParam();
+    // Auto-reparo: el admin nunca necesitó su propio doc en insumos_users
+    // para entrar (atajo de arriba), pero sí aparece en "Gestión de
+    // usuarios" — si nunca se creó, lo creamos acá sin bloquear el resto.
+    _db.collection(DB_USERS).doc(ADMIN_EMAIL)
+      .set({email:ADMIN_EMAIL,name:ADMIN_EMAIL,addedAt:new Date().toISOString(),addedBy:'system'},{merge:true})
+      .catch(function(e){ console.warn('[admin self-heal]',e); });
+    return;
+  }
   _checkUserAccess(user);
 });
 // ─── Notification tab navigation ─────────────────────────────────────────────
