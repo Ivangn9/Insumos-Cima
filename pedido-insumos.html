@@ -874,6 +874,19 @@
   </div>
 </div>
 
+<!-- ─── Modal confirmar actualización con datos sin enviar ─── -->
+<div class="modal-overlay" id="updateConfirmOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title">Hay un pedido sin enviar</div>
+    <div class="modal-desc">Actualizar ahora va a borrar lo que ya completaste en este formulario. ¿Actualizar igual?</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('updateConfirmOverlay').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-ghost-red" onclick="document.getElementById('updateConfirmOverlay').classList.remove('open');applyUpdate()">Actualizar igual</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Share fallback modal ────────────────────────── -->
 <div class="modal-overlay" id="shareOverlay">
   <div class="modal-box">
@@ -1026,7 +1039,7 @@
     <div class="form-grid">
       <div class="form-group">
         <label>Solicitante</label>
-        <input type="text" id="solicitante" placeholder="Nombre y apellido…" autocomplete="name" />
+        <input type="text" id="solicitante" placeholder="Nombre y apellido…" autocomplete="name" maxlength="199" />
       </div>
       <div class="form-group">
         <label>Fecha del pedido</label>
@@ -1202,7 +1215,7 @@ function renderSupplies(filter) {
     block.innerHTML = `
       <div class="cat-header">
         <div class="cat-icon-wrap" style="background:${cat.color}">${cat.icon}</div>
-        <span class="cat-title">${catName}</span>
+        <span class="cat-title">${escHtml(catName)}</span>
       </div>
       <div class="col-heads">
         <span class="col-head">Cantidad</span>
@@ -1222,8 +1235,8 @@ function renderSupplies(filter) {
         <div class="supply-info">
           <div class="supply-ico" style="background:${cat.color}">${cat.icon}</div>
           <div class="supply-text">
-            <div class="supply-name">${item.name}</div>
-            <div class="supply-code">${item.code}</div>
+            <div class="supply-name">${escHtml(item.name)}</div>
+            <div class="supply-code">${escHtml(item.code)}</div>
           </div>
         </div>
         <div class="counters">
@@ -1613,8 +1626,12 @@ async function checkUpdate(userTriggered = true) {
       document.getElementById("versionDot").classList.add("outdated");
       document.getElementById("newVersionLabel").textContent = "V" + latest;
       document.getElementById("updateBanner").classList.add("visible");
-      // Si el usuario tocó el botón → actualizar de inmediato, sin pasos extra
-      if (userTriggered) { await applyUpdate(); return; }
+      // Si el usuario tocó el botón: actualizar de inmediato SALVO que haya
+      // un pedido a medio completar — antes se pisaba sin avisar (fix 2026-08-07).
+      if (userTriggered) {
+        if (hasUnsavedData()) { document.getElementById("updateConfirmOverlay").classList.add("open"); return; }
+        await applyUpdate(); return;
+      }
       // Auto-check silencioso + sin datos cargados → actualizar solo
       if (!hasUnsavedData()) { await applyUpdate(); return; }
       // Tiene datos cargados → solo mostrar banner para que decida
@@ -1973,6 +1990,15 @@ function _iosFallback(doc, fname) {
 }
 
 // ─── Supplies loader (Firestore) ─────────────────────────────────────────────
+// El listener de "supplies" se registraba ANTES de que la sesión anónima
+// terminara de resolver — si el primer intento llegaba sin auth lista,
+// Firestore lo rechazaba con permission-denied, que solo hacía
+// console.warn (sin toast, sin reintento) y la SDK compat NO re-suscribe
+// sola un listener terminado por error de permisos: el catálogo quedaba
+// "Cargando…" para siempre. Fix 2026-08-07: _suppliesSubscribed evita
+// duplicar el listener, y se resetea en el catch para permitir UN
+// reintento automático desde el onAuthStateChanged de más abajo.
+let _suppliesSubscribed=false;
 function loadSuppliesFromFirestore(){
   const CACHE_KEY="pedido_supplies_cache";
   function applySupplies(data){
@@ -1993,13 +2019,26 @@ function loadSuppliesFromFirestore(){
     const cached=localStorage.getItem(CACHE_KEY);
     if(cached) applySupplies(JSON.parse(cached));
   }catch(e){}
+  if(_suppliesSubscribed) return;
+  _suppliesSubscribed=true;
   // Then sync from Firestore in background
   window._pedidoDB.collection("insumos_cima").doc("supplies").onSnapshot(snap=>{
     if(!snap.exists) return;
     const data=(snap.data().data||[]).filter(s=>s.active!==false);
     try{ localStorage.setItem(CACHE_KEY,JSON.stringify(data)); }catch(e){}
     applySupplies(data);
-  },e=>console.warn("Supplies load error:",e));
+  },e=>{
+    console.warn("Supplies load error:",e);
+    _suppliesSubscribed=false;
+    if(e&&e.code==="permission-denied"&&!_firebaseAuthReady){
+      // Probablemente la auth anónima todavía no había resuelto — el
+      // onAuthStateChanged de initFirebasePedido() reintenta solo apenas
+      // haya sesión. Si ya había auth y igual falló, no hay nada más que
+      // reintentar automáticamente.
+    } else {
+      toast("⚠️ No se pudo cargar el catálogo — recargá la página");
+    }
+  });
 }
 
 // ─── Firebase / Solicitudes ───────────────────────────────────────────────────
@@ -2025,9 +2064,10 @@ let _firebaseAuthError = null;
         _firebaseAuthError = null;
         console.log("Firebase auth OK:", user.isAnonymous ? "anónimo" : user.email);
         subscribeToPedidos();
+        if(!_suppliesSubscribed) loadSuppliesFromFirestore();
       } else {
         firebase.auth().signInAnonymously()
-          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; subscribeToPedidos(); })
+          .then(()=>{ _firebaseAuthReady=true; _firebaseAuthError=null; subscribeToPedidos(); if(!_suppliesSubscribed) loadSuppliesFromFirestore(); })
           .catch(e=>{
             _firebaseAuthError = e.code||e.message;
             console.warn("Firebase anon auth falló:", e.code, e.message);
@@ -2231,6 +2271,13 @@ async function enviarPedido(){
       items.push({id:item.id,name:item.name,cat:"Adicionales",
         cantidad:q.cantidad||0,caja:q.caja||0,pack:q.pack||0,custom:true});
     });
+    // isValidSolicitud() en firestore.rules exige items.size() < 200 —
+    // validarlo acá evita el permission-denied genérico y confuso del catch.
+    if(items.length>=200){
+      toast("⚠️ Demasiados insumos en un solo pedido (máx. 199) — enviá el resto en un pedido aparte");
+      if(btn){btn.disabled=false;btn.innerHTML='<span class="btn-icon">&#10148;</span> Enviar Pedido';}
+      return;
+    }
     // Authenticate (Google session if available, else anonymous)
     try{ await _ensurePedidoAuth(); }
     catch(authErr){
@@ -2259,8 +2306,20 @@ async function enviarPedido(){
     let desc  = "";
 
     if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
-      title = "Sin permiso de escritura";
-      desc  = "Firebase rechazó el pedido por falta de permisos.\n\nSolución: activá el acceso anónimo en Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+      // "permission-denied" tiene dos causas muy distintas y antes se
+      // mostraba siempre el mismo mensaje ("activá el acceso anónimo"), que
+      // es incorrecto y confunde al administrador cuando la causa real es
+      // otra (fix 2026-08-07): si HAY sesión (anónima o no), la auth está
+      // bien y el rechazo es porque el pedido no cumple isValidSolicitud()
+      // en las reglas — típicamente nombre del solicitante muy largo, o
+      // demasiados insumos (isValidSolicitud exige items.size() < 200).
+      if (!firebase.auth().currentUser) {
+        title = "Sin permiso de escritura";
+        desc  = "Firebase rechazó el pedido por falta de permisos.\n\nSolución: activá el acceso anónimo en Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";
+      } else {
+        title = "El pedido no se pudo enviar";
+        desc  = "Firebase lo rechazó por su formato — probablemente el nombre del solicitante es muy largo, o hay demasiados insumos en un solo pedido (máximo 200).\n\nRevisá esos datos y probá de nuevo. Si el problema sigue, avisale al administrador.";
+      }
     } else if (raw.includes("AUTH_DISABLED") || raw.includes("auth/operation-not-allowed")) {
       title = "Autenticación no habilitada";
       desc  = "El acceso anónimo está desactivado en Firebase.\n\nSolución: Firebase Console → Authentication → Sign-in method → Anonymous → Habilitar.";

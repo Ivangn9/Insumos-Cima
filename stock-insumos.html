@@ -2871,6 +2871,7 @@ function _ensureMovementsListener(center){
   }
 }
 let _pracConfig = null;          // {practicas:[...]}
+let _pracConfigLoadedV = 0;      // versión conocida al cargar — control de concurrencia optimista en _savePracConfig()
 let _pracMes = {};               // {"2026-06": {"rmn__reso_simple": qty, ...}}
 let _pracView = 'costos';        // 'costos' | 'cierre'
 let _pracActivePrac = null;      // id of selected practice group
@@ -5054,7 +5055,9 @@ function saveMovimiento(){
     ...(presentacion&&{presentacion}),
     ...(currentUser?.email&&{user:currentUser.email})
   };
-  document.getElementById("movModal").classList.remove("open");
+  // El modal se cierra recién si la transacción sale bien (más abajo) — antes
+  // se cerraba acá optimistamente, así que un rechazo (ej. stock insuficiente)
+  // dejaba al usuario sin el modal para corregir la cantidad.
   _txnCenter(center,function(data){
     if(_movType==="entrada"&&fechaVenc){
       _lotesEntrada(data.lotes,supplyId,qty,fechaVenc,presentacion,date);
@@ -5064,11 +5067,17 @@ function saveMovimiento(){
       if(r.consumedLotes.length) mov.lotesConsumidos=r.consumedLotes;
     }
     const stockAntes=data.stock[supplyId]||0;
-    if(_movType==="salida"&&qty>stockAntes) toast("⚠️ Stock insuficiente: hay "+stockAntes+" pero se registran "+qty);
+    if(_movType==="salida"&&qty>stockAntes){
+      // Aborta la transacción — antes solo avisaba con un toast y dejaba
+      // igual el stock en negativo, lo que después distorsiona reportes,
+      // gráficas y el indicador de stock bajo.
+      throw Object.assign(new Error("Stock insuficiente: hay "+stockAntes+" "+(s.unit||"ud")+" y se quiere registrar una salida de "+qty+"."),{code:"stock-insuficiente"});
+    }
     data.stock[supplyId]=(data.stock[supplyId]||0)+(_movType==="entrada"?qty:-qty);
     _movPush(data,mov);
     return data;
   }).then(function(data){
+    document.getElementById("movModal").classList.remove("open");
     cs[center].stock=data.stock;
     if(data.movements) cs[center].movements=data.movements; // legacy: migrado lo maneja el listener de la subcolección
     cs[center].lotes=data.lotes;
@@ -5080,7 +5089,7 @@ function saveMovimiento(){
     updateVencBadge();
   }).catch(function(e){
     console.warn("Error al guardar movimiento:",e);
-    toast(_txnErrorMsg(e,"⚠️ Error al guardar. Intentá de nuevo."));
+    toast(e&&e.code==="stock-insuficiente"?"⚠️ "+e.message:_txnErrorMsg(e,"⚠️ Error al guardar. Intentá de nuevo."));
   });
 }
 
@@ -5256,38 +5265,75 @@ function saveSupply(){
   const pedidoFormatos=Array.from(_addFmts);
   if(!name){toast("⚠️ Ingresá el nombre del insumo");return;}
   if(presentacion==="caja"&&unidadesPorCaja<1){toast("⚠️ Ingresá las unidades por caja");return;}
+  const center=activeCenter;
+
+  // NOTA (fix 2026-08-07): antes esta función guardaba con persist(), que
+  // reescribe con .set() los documentos ENTEROS de center_GN/center_Sarmiento
+  // desde el estado en memoria (cs). Si otro dispositivo registraba un
+  // movimiento (vía _txnCenter, transaccional) de CUALQUIER insumo del mismo
+  // centro mientras este modal estaba abierto, ese cambio se perdía en
+  // silencio al guardar acá. Ahora: los metadatos del insumo (nombre, precio,
+  // categoría, …) se guardan aparte con persistSupplies() (solo toca el doc
+  // "supplies", sin blast radius sobre el stock), y cualquier cambio de
+  // stock pasa por _txnCenter (lectura fresca + escritura atómica), igual
+  // que entrada/salida/traslado.
   if(_editId){
-    const s=supplies.find(x=>x.id===_editId);
+    const id=_editId;
+    const s=supplies.find(x=>x.id===id);
     const before=s?{name:s.name,code:s.code,price:s.price,category:s.category}:null;
-    if(s){Object.assign(s,{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos});cs[activeCenter].stock[s.id]=initStk;}
+    if(s){ Object.assign(s,{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos}); }
     _auditLog('supply_edit',`Insumo editado: "${name}"`,before,{name,code,price,category});
+    persistSupplies();
     toast("✓ Insumo actualizado");
-  }else{
-    const id="cus_"+Date.now();
-    supplies.push({id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos});
-    CENTERS.forEach(c=>{if(!cs[c].stock[id])cs[c].stock[id]=0;});
-    cs[activeCenter].stock[id]=initStk;
-    if(initStk>0){
-      const initMovId="mov_init_"+id;
-      const initMov={id:initMovId,supplyId:id,supplyName:name,type:"entrada",qty:initStk,date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),note:"Stock inicial"};
-      if(cs[activeCenter].movementsMigrated){
-        // Centro migrado: el movimiento va directo a la subcolección, NUNCA al
-        // array embebido — si no, persist() más abajo reescribiría el doc del
-        // centro con cs[activeCenter] entero y reintroduciría `movements`.
-        const key=activeCenter==="GN"?"center_GN":"center_Sarmiento";
-        _db.collection(DB_COL).doc(key).collection("movements").doc(initMovId).set(initMov)
-          .catch(e=>console.warn('[Stock inicial]',e));
-      } else {
-        cs[activeCenter].movements.push(initMov);
-      }
+    document.getElementById("addModal").classList.remove("open");
+    renderGestion();
+    if(currentTab==="inventario")renderInventario();
+
+    const prevStock=cs[center].stock[id]||0;
+    if(initStk!==prevStock){
+      _txnCenter(center,function(data){
+        data.stock[id]=initStk;
+        return data;
+      }).then(function(data){
+        cs[center].stock=data.stock;
+        _auditLog('stock_adjust',`Ajuste manual de stock: "${name}" ${prevStock} → ${initStk} en ${center}`,{stock:prevStock},{stock:initStk});
+        updateCenterStats();
+        if(currentTab==="inventario")renderCurrentTab();
+      }).catch(function(e){
+        console.warn('Error ajustando stock:',e);
+        toast("⚠️ Los datos del insumo se guardaron, pero no se pudo ajustar el stock: "+(e.message||e));
+      });
     }
-    _auditLog('supply_add',`Insumo creado: "${name}" (${code||'sin código'}) — precio: $${price}`);
-    toast("✓ Insumo agregado");
+    return;
   }
-  persist();
+
+  const id="cus_"+Date.now();
+  supplies.push({id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos});
+  _auditLog('supply_add',`Insumo creado: "${name}" (${code||'sin código'}) — precio: $${price}`);
+  persistSupplies();
+  toast("✓ Insumo agregado");
   document.getElementById("addModal").classList.remove("open");
   renderGestion();
   if(currentTab==="inventario")renderInventario();
+
+  CENTERS.forEach(function(c){
+    const qty=c===center?initStk:0;
+    _txnCenter(c,function(data){
+      data.stock[id]=qty;
+      if(qty>0){
+        _movPush(data,{id:"mov_init_"+id+"_"+c,supplyId:id,supplyName:name,type:"entrada",qty,
+          date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),note:"Stock inicial"});
+      }
+      return data;
+    }).then(function(data){
+      cs[c].stock=data.stock;
+      if(data.movements) cs[c].movements=data.movements;
+      if(c===center){ updateCenterStats(); if(currentTab==="inventario")renderCurrentTab(); }
+    }).catch(function(e){
+      console.warn('Error inicializando stock del nuevo insumo en',c,e);
+      toast("⚠️ El insumo se creó, pero no se pudo inicializar el stock en "+c+": "+(e.message||e));
+    });
+  });
 }
 
 // ─── Confirm ─────────────────────────────────────────────────────────────────
@@ -5555,6 +5601,7 @@ function startListeners(){
   _unsubPrac = _db.collection(DB_COL).doc("practicas_config").onSnapshot(snap=>{
     if(snap.exists){
       _pracConfig = snap.data();
+      _pracConfigLoadedV = _pracConfig._v||0;
       // Migración transparente y única: asigna ids estables a insumos legacy
       // (config cargada por posición) para que agregar/quitar insumos no
       // corrompa las vinculaciones manuales existentes.
@@ -5563,8 +5610,10 @@ function startListeners(){
       // Seed defaults only when el SERVIDOR confirma que el doc no existe —
       // un miss del cache offline nunca debe disparar la siembra de defaults
       _pracConfig = PRAC_DEFAULT_CONFIG;
+      _pracConfigLoadedV = 0;
       _pracEnsureStableIds();
-      _db.collection(DB_COL).doc("practicas_config").set(_pracConfig)
+      _db.collection(DB_COL).doc("practicas_config").set(Object.assign({},_pracConfig,{_v:1}))
+        .then(()=>{_pracConfigLoadedV=1;})
         .catch(e=>console.warn('[PracConfig seed]',e));
     }
     if(currentTab==="contable") renderContable();
@@ -5597,7 +5646,7 @@ function renderAdminUsers(users){
       <span class="users-row-email">${escHtml(u.email)}</span>
       <span class="users-row-badge">${u.email===ADMIN_EMAIL?"Admin":"Usuario"}</span>
       <button class="btn-remove-user" style="background:rgba(0,113,227,.10);color:#0071e3;border-color:rgba(0,113,227,.2)" onclick="openResetPassModal('${escJs(u.email)}')">Contraseña</button>
-      ${u.email===ADMIN_EMAIL?"":"<button class=\"btn-remove-user\" onclick=\"removeUser('"+escAttr(u.email)+"')\" >Quitar</button>"}
+      ${u.email===ADMIN_EMAIL?"":"<button class=\"btn-remove-user\" onclick=\"removeUser('"+escJs(u.email)+"')\" >Quitar</button>"}
     </div>
   `).join("");
 }
@@ -6732,27 +6781,31 @@ function openSolicitudDetalle(id){
   const allDone=totalCount>0&&prepCount===totalCount;
 
   function itemRow(item,i){
-    const key=item.id||("item_"+i);
+    // item.id/cantidad/caja/pack vienen de un pedido público (login anónimo
+    // permitido) — isValidSolicitud() en firestore.rules NO valida el
+    // contenido de items en profundidad, así que son texto no confiable:
+    // hay que escapar igual que item.name (ya lo hacía con escHtml más abajo).
+    const key=String(item.id||("item_"+i));
     const done=preparados.includes(key);
-    return `<div id="prow-${key}" onclick="toggleItemPrep('${id}','${key}')"
+    return `<div id="prow-${escAttr(key)}" onclick="toggleItemPrep('${escJs(id)}','${escJs(key)}')"
       style="padding:12px 16px;display:flex;align-items:center;gap:12px;
              ${i<items.length-1?"border-bottom:1px solid #f2f2f7;":""}
              cursor:pointer;-webkit-tap-highlight-color:transparent;
              background:${done?"rgba(48,209,88,0.08)":"transparent"};transition:background .15s">
-      <div id="pchk-${key}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
+      <div id="pchk-${escAttr(key)}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
            border:2px solid ${done?"#34c759":"#c7c7cc"};
            background:${done?"#34c759":"transparent"};
            display:flex;align-items:center;justify-content:center;transition:all .2s">
         ${done?`<svg width="11" height="11" viewBox="0 0 11 11"><polyline points="1.5,5.5 4,8.5 9.5,2" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`:""}
       </div>
       <div style="flex:1;min-width:0">
-        <div id="pname-${key}" style="font-size:.87rem;font-weight:600;
+        <div id="pname-${escAttr(key)}" style="font-size:.87rem;font-weight:600;
              color:${done?"#8e8e93":"#1c1c1e"};
              text-decoration:${done?"line-through":"none"};transition:all .2s">${escHtml(item.name||"")}</div>
         <div style="font-size:.78rem;color:#636366;display:flex;gap:8px;margin-top:2px">
-          ${item.cantidad?`<span><b>${item.cantidad}</b> und</span>`:""}
-          ${item.caja?`<span><b>${item.caja}</b> caja</span>`:""}
-          ${item.pack?`<span><b>${item.pack}</b> pack</span>`:""}
+          ${item.cantidad?`<span><b>${escHtml(String(item.cantidad))}</b> und</span>`:""}
+          ${item.caja?`<span><b>${escHtml(String(item.caja))}</b> caja</span>`:""}
+          ${item.pack?`<span><b>${escHtml(String(item.pack))}</b> pack</span>`:""}
         </div>
       </div>
     </div>`;
@@ -7455,9 +7508,16 @@ async function deleteEntrega(entregaId){
   openConfirm("Eliminar entrega","¿Eliminar este registro de entrega?",async()=>{
     try{
       const eqId=entregasActiveEquipo.id;
-      const snap=await _db.collection(DB_COL).doc("entregas").get();
-      const arr=(snap.exists?(snap.data()[eqId]||[]):[]).filter(h=>h.id!==entregaId);
-      await _db.collection(DB_COL).doc("entregas").set({[eqId]:arr},{merge:true});
+      const ref=_db.collection(DB_COL).doc("entregas");
+      // Transacción (no .get()+.set() suelto): si dos personas borran
+      // entregas distintas del mismo equipo casi al mismo tiempo, la
+      // versión anterior podía hacer que la segunda escritura reintroduzca
+      // la entrega que la primera ya había borrado (lectura vieja).
+      await _db.runTransaction(async(txn)=>{
+        const snap=await txn.get(ref);
+        const arr=(snap.exists?(snap.data()[eqId]||[]):[]).filter(h=>h.id!==entregaId);
+        txn.set(ref,{[eqId]:arr},{merge:true});
+      });
       toast("✓ Entrega eliminada");
       await loadEntregasHistorial(eqId);
     }catch(e){toast("⚠️ "+e.message);}
@@ -7724,8 +7784,33 @@ function clearPracLink(){
 }
 
 function _savePracConfig(){
-  _db.collection(DB_COL).doc("practicas_config").set(_pracConfig)
-    .catch(()=>toast('⚠️ Error guardando configuración'));
+  // Antes hacía .set(_pracConfig) directo: si dos personas editaban la
+  // config contable (vincular insumo a un estudio, alta/baja de estudio) casi
+  // al mismo tiempo, la segunda escritura pisaba en silencio el cambio de la
+  // primera. Ahora usa control de concurrencia optimista (_v): si el doc
+  // cambió en el servidor desde que lo cargamos acá, aborta y avisa en vez
+  // de pisarlo — el usuario puede recargar y reintentar su cambio.
+  const ref=_db.collection(DB_COL).doc("practicas_config");
+  const toSave=Object.assign({},_pracConfig);
+  const nextV=_pracConfigLoadedV+1;
+  _db.runTransaction(function(txn){
+    return txn.get(ref).then(function(snap){
+      const serverV=(snap.exists?snap.data()._v:0)||0;
+      if(serverV!==_pracConfigLoadedV){
+        throw Object.assign(new Error('conflict'),{code:'prac-config-conflict'});
+      }
+      toSave._v=nextV;
+      txn.set(ref,toSave);
+    });
+  }).then(function(){
+    _pracConfigLoadedV=nextV;
+  }).catch(function(e){
+    if(e&&e.code==='prac-config-conflict'){
+      toast('⚠️ Otra persona modificó esta configuración justo ahora — recargá la página y volvé a intentar tu cambio');
+    } else {
+      toast('⚠️ Error guardando configuración');
+    }
+  });
 }
 
 // ─── Agregar / eliminar estudios completos dentro de una categoría ────────────
