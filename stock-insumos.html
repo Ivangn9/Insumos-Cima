@@ -1892,6 +1892,7 @@
     <div class="prac-view-toggle">
       <button class="prac-view-btn active" id="prac-btn-costos" onclick="setPracView('costos')">💰 Costos por Práctica</button>
       <button class="prac-view-btn" id="prac-btn-cierre" onclick="setPracView('cierre')">📅 Cierre Mensual</button>
+      <button class="prac-view-btn" id="prac-btn-movs" onclick="setPracView('movs')">🔄 Entradas y Salidas</button>
     </div>
     <div id="contableContainer"></div>
   </div>
@@ -2490,7 +2491,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.1";
+const APP_VERSION = "6.2";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2873,9 +2874,12 @@ function _ensureMovementsListener(center){
 let _pracConfig = null;          // {practicas:[...]}
 let _pracConfigLoadedV = 0;      // versión conocida al cargar — control de concurrencia optimista en _savePracConfig()
 let _pracMes = {};               // {"2026-06": {"rmn__reso_simple": qty, ...}}
-let _pracView = 'costos';        // 'costos' | 'cierre'
+let _pracView = 'costos';        // 'costos' | 'cierre' | 'movs'
 let _pracActivePrac = null;      // id of selected practice group
 let _pracCierreMes = null;       // "YYYY-MM" of active cierre
+let _pracMovCenter = 'Todas';    // 'GN' | 'Sarmiento' | 'Todas' — filtro de sucursal para Entradas y Salidas
+let _pracMovMes = null;          // "YYYY-MM" activo en Entradas y Salidas
+let _pracMovExcluded = new Set(); // ids de movimientos desmarcados manualmente (quedan afuera del export)
 let solicitudes = [];
 let _knownSolicitudIds = null; // null = primera carga, no notificar
 
@@ -7646,6 +7650,7 @@ function setPracView(view){
   _pracView=view;
   document.getElementById('prac-btn-costos').className='prac-view-btn'+(view==='costos'?' active':'');
   document.getElementById('prac-btn-cierre').className='prac-view-btn'+(view==='cierre'?' active':'');
+  document.getElementById('prac-btn-movs').className='prac-view-btn'+(view==='movs'?' active':'');
   renderContable();
 }
 
@@ -7657,7 +7662,8 @@ function renderContable(){
     return;
   }
   if(_pracView==='costos') renderPracCostos(el);
-  else renderPracCierre(el);
+  else if(_pracView==='cierre') renderPracCierre(el);
+  else renderPracMovs(el);
 }
 
 // ─── Vista: Costos por Práctica ───────────────────────────────────────────────
@@ -8001,6 +8007,7 @@ function renderPracCierre(el){
       onchange="setPracMes(this.value)">${_monthOptionsHtml(_pracCierreMes, Object.keys(_pracMes||{}))}</select>
     <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="savePracMes()">💾 Guardar mes</button>
     <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="exportContablePDF()">📄 Exportar PDF</button>
+    <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableExcel()">📊 Exportar Excel</button>
   </div>`;
 
   const totalBar=`<div class="prac-total-bar">
@@ -8266,6 +8273,221 @@ async function exportContablePDF(){
     toast("✓ PDF contable exportado");
   }catch(e){
     console.error(e);toast("⚠️ Error al generar PDF");
+  }
+}
+
+// Mismo dato que exportContablePDF() pero en .xlsx — pensado para mandar directo
+// al estudio contable sin pasar por PDF.
+async function exportContableExcel(){
+  if(!_pracConfig){toast("⚠️ Configuración no cargada");return;}
+  if(!_pracCierreMes){toast("⚠️ Seleccioná un mes");return;}
+  // Mismo volcado + persistencia que el export a PDF, para que ambos formatos
+  // siempre coincidan con lo que hay guardado.
+  document.querySelectorAll('.prac-mes-input').forEach(function(inp){
+    const k=inp.dataset.key; const q=parseInt(inp.value)||0;
+    if(k){ if(!_pracMes[_pracCierreMes]) _pracMes[_pracCierreMes]={}; if(q>0) _pracMes[_pracCierreMes][k]=q; else delete _pracMes[_pracCierreMes][k]; }
+  });
+  try{
+    await _db.collection(DB_COL).doc("practicas_mes").set({[_pracCierreMes]:_pracMes[_pracCierreMes]||{}},{merge:true});
+  }catch(e){
+    console.warn('[Contable] Error guardando antes de exportar:',e);
+    toast("⚠️ No se pudo guardar el cierre — el Excel puede no coincidir con lo guardado. Reintentá.");
+    return;
+  }
+  toast("Generando Excel…");
+  try{
+    await _piLoadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    if(typeof XLSX==='undefined') throw new Error('No se pudo iniciar el generador de Excel');
+
+    const pracs=_pracConfig.practicas||[];
+    const mesData=_pracMes[_pracCierreMes]||{};
+    const mesLabel=new Date(_pracCierreMes+'-02').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+    const mesLabelCap=mesLabel.charAt(0).toUpperCase()+mesLabel.slice(1);
+
+    const aoa=[["Control Contable de Prácticas — CIMA"],[mesLabelCap],[],["Categoría","Estudio","Costo unitario","Cantidad","Costo total"]];
+    let grandTotal=0,totalStudies=0;
+    pracs.forEach(p=>{
+      p.subPracticas.forEach(sp=>{
+        const key=p.id+"__"+sp.id;
+        const qty=parseInt(mesData[key])||0;
+        if(qty<=0) return;
+        const{total}=_pracCalcSubCost(sp,p.id);
+        const rowTotal=qty*total;
+        grandTotal+=rowTotal; totalStudies+=qty;
+        aoa.push([p.nombre,sp.nombre,total,qty,rowTotal]);
+      });
+    });
+    if(aoa.length<=4){toast("⚠️ No hay estudios cargados para este mes");return;}
+    aoa.push([]);
+    aoa.push(["","","","TOTAL ESTUDIOS",totalStudies]);
+    aoa.push(["","","","COSTO TOTAL",grandTotal]);
+
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']=[{wch:22},{wch:30},{wch:15},{wch:12},{wch:16}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Cierre Mensual");
+    _downloadXlsxWorkbook(wb,"contable-cima-"+_pracCierreMes+".xlsx");
+    toast("✓ Excel contable exportado");
+  }catch(e){
+    console.error(e);toast("⚠️ Error al generar Excel");
+  }
+}
+
+// Serializa un workbook de SheetJS a .xlsx y dispara la descarga — mismo
+// patrón blob+link que exportContablePDF(), con el mismo fallback de iOS
+// (Safari móvil no deja bajar blobs con click programático, así que se abre
+// en pestaña nueva como data URL para que el usuario lo guarde a mano).
+function _downloadXlsxWorkbook(wb,filename){
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS){
+    const reader=new FileReader();
+    reader.onload=()=>{window.open(reader.result,'_blank');};
+    reader.readAsDataURL(blob);
+  }else{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
+  }
+}
+
+// ─── Vista: Entradas y Salidas (control contable manual) ──────────────────────
+// Junta los movimientos de stock (altas/bajas ya registradas en "Movimientos")
+// de un mes+sucursal para mandarle un control al estudio contable. El usuario
+// puede destildar manualmente los movimientos que no quiere incluir (p.ej.
+// traslados internos entre sucursales, o cargas de prueba) antes de exportar.
+function _pracMovList(){
+  const centers=_pracMovCenter==='Todas'?CENTERS:[_pracMovCenter];
+  let all=[];
+  centers.forEach(function(c){
+    (cs[c]&&cs[c].movements||[]).forEach(function(m){ all.push(Object.assign({},m,{_center:c})); });
+  });
+  if(_pracMovMes) all=all.filter(function(m){ return String(m.date||'').slice(0,7)===_pracMovMes; });
+  return all.sort(function(a,b){ return (b.date+(b.time||'')).localeCompare(a.date+(a.time||'')); });
+}
+
+function renderPracMovs(el){
+  const today=new Date();
+  if(!_pracMovMes) _pracMovMes=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  const rows=_pracMovList();
+  const mesLabel=_monthLabel(_pracMovMes);
+
+  const selStyle="padding:8px 12px;border-radius:10px;border:1.5px solid #d1d5db;font-size:16px;font-weight:600;color:#1c1c1e;background:#fff;cursor:pointer";
+  const filtersHtml=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <select id="prac-mov-center-sel" style="${selStyle}" onchange="setPracMovCenter(this.value)">
+      <option value="Todas"${_pracMovCenter==='Todas'?' selected':''}>Todas las sucursales</option>
+      <option value="GN"${_pracMovCenter==='GN'?' selected':''}>GN · Guardias Nacionales</option>
+      <option value="Sarmiento"${_pracMovCenter==='Sarmiento'?' selected':''}>Pedernera-Sarmiento</option>
+    </select>
+    <select id="prac-mov-mes-sel" style="${selStyle}" onchange="setPracMovMes(this.value)">${_monthOptionsHtml(_pracMovMes,[])}</select>
+    <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(true)">☑ Marcar todos</button>
+    <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(false)">☐ Desmarcar todos</button>
+    <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableMovsExcel()">📊 Exportar Excel</button>
+  </div>`;
+
+  let selCount=0, montoSel=0;
+  rows.forEach(function(m){
+    if(_pracMovExcluded.has(m.id)) return;
+    selCount++;
+    if(m.type==='salida'&&!m.traslado){
+      const s=supplies.find(function(x){return x.id===m.supplyId;});
+      montoSel+=m.qty*(s?.price||0);
+    }
+  });
+
+  const totalBar=`<div class="prac-total-bar">
+    <div><div class="label">Seleccionados para exportar</div><div style="font-size:.72rem;opacity:.6;margin-top:2px">${escHtml(mesLabel)} · ${selCount} de ${rows.length} movimientos</div></div>
+    <div class="value">${_pracFmt(montoSel)}</div>
+  </div>`;
+
+  if(!rows.length){
+    el.innerHTML=filtersHtml+`<div style="padding:24px;text-align:center;color:var(--text3)">Sin movimientos registrados en este período.</div>`;
+    return;
+  }
+
+  const listHtml=rows.map(function(m){
+    const s=supplies.find(function(x){return x.id===m.supplyId;});
+    const unit=s?.unit||'UND';
+    const checked=!_pracMovExcluded.has(m.id);
+    const sign=m.type==='entrada'?'+':'−';
+    const icon=m.type==='entrada'?'📥':'📤';
+    const montoTag=(m.type==='salida'&&s?.price&&!m.traslado)?' · $'+fmt(m.qty*s.price):'';
+    const centerTag=_pracMovCenter==='Todas'?' · '+escHtml(m._center):'';
+    const trasladoTag=m.traslado?' · 🔀 Traslado':'';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer">
+      <input type="checkbox" ${checked?'checked':''} onchange="_pracMovToggle('${escAttr(m.id)}',this.checked)" style="width:18px;height:18px;flex-shrink:0">
+      <span style="flex-shrink:0">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.85rem;font-weight:700;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(m.supplyName)}</div>
+        <div style="font-size:.7rem;color:#8e8e93">${fmtDate(m.date)} ${m.time||''}${centerTag}${trasladoTag}${montoTag}</div>
+      </div>
+      <span style="flex-shrink:0;font-weight:800;color:${m.type==='entrada'?'#34c759':'#ff3b30'}">${sign}${m.qty} ${escHtml(unit)}</span>
+    </label>`;
+  }).join('');
+
+  el.innerHTML=filtersHtml+totalBar+`<div class="prac-card" style="margin-top:0"><div class="prac-card-body" style="padding:0">${listHtml}</div></div>`;
+}
+
+function setPracMovCenter(val){ _pracMovCenter=val; renderContable(); }
+function setPracMovMes(val){ _pracMovMes=val; renderContable(); }
+function _pracMovToggle(id,checked){
+  if(checked) _pracMovExcluded.delete(id); else _pracMovExcluded.add(id);
+  renderContable();
+}
+function _pracMovToggleAll(checkAll){
+  _pracMovList().forEach(function(m){
+    if(checkAll) _pracMovExcluded.delete(m.id); else _pracMovExcluded.add(m.id);
+  });
+  renderContable();
+}
+
+async function exportContableMovsExcel(){
+  const rows=_pracMovList().filter(function(m){ return !_pracMovExcluded.has(m.id); });
+  if(!rows.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
+  toast("Generando Excel…");
+  try{
+    await _piLoadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    if(typeof XLSX==='undefined') throw new Error('No se pudo iniciar el generador de Excel');
+
+    const mesLabel=_monthLabel(_pracMovMes);
+    const centerLabel=_pracMovCenter==='Todas'?'Todas las sucursales':((BRAND_THEMES[_pracMovCenter]&&BRAND_THEMES[_pracMovCenter].nombre)||_pracMovCenter);
+
+    const aoa=[["Control de Entradas y Salidas de Insumos — CIMA"],[mesLabel+" · "+centerLabel],[],
+      ["Fecha","Hora","Sucursal","Tipo","Insumo","Cantidad","Unidad","Precio unitario","Monto","Traslado","Proveedor","Nota","Usuario"]];
+
+    let ent=0,sal=0,monto=0;
+    rows.sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); }).forEach(function(m){
+      const s=supplies.find(function(x){return x.id===m.supplyId;});
+      const precio=s?.price||0;
+      const esGasto=m.type==='salida'&&!m.traslado;
+      const rowMonto=esGasto?m.qty*precio:0;
+      if(m.type==='entrada') ent+=m.qty; else sal+=m.qty;
+      if(esGasto) monto+=rowMonto;
+      aoa.push([
+        m.date||'', m.time||'', m._center||'',
+        m.type==='entrada'?'Entrada':'Salida',
+        m.supplyName||'', m.qty||0, s?.unit||'UND',
+        precio>0?precio:'', esGasto?rowMonto:'',
+        m.traslado?'Sí':'No',
+        m.proveedorName||'', m.note||'', m.user||''
+      ]);
+    });
+    aoa.push([]);
+    aoa.push(["","","","Entradas (unidades)",ent]);
+    aoa.push(["","","","Salidas (unidades)",sal]);
+    aoa.push(["","","","Monto total (gasto real)",monto]);
+
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']=[{wch:12},{wch:8},{wch:14},{wch:10},{wch:32},{wch:10},{wch:8},{wch:14},{wch:14},{wch:10},{wch:18},{wch:24},{wch:16}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Entradas y Salidas");
+    const filename="entradas-salidas-cima-"+(_pracMovCenter==='Todas'?'todas':_pracMovCenter)+"-"+(_pracMovMes||'')+".xlsx";
+    _downloadXlsxWorkbook(wb,filename);
+    toast("✓ Excel de entradas y salidas exportado");
+  }catch(e){
+    console.error(e);toast("⚠️ Error al generar Excel");
   }
 }
 
