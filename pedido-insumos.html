@@ -2204,6 +2204,14 @@ async function _ensurePedidoAuth(){
   }
 }
 
+// Envío idempotente: el ID del documento se genera ANTES de enviar y se
+// reutiliza mientras el contenido del pedido no cambie. Antes era .add(), que
+// crea un ID nuevo en cada intento: si la señal era mala, el envío quedaba
+// colgado en "Enviando…" sin límite, y al reintentar podía llegar DOS veces.
+// Ahora: si el servidor no confirma en PEDIDO_TIMEOUT_MS se avisa, y un
+// reintento con el mismo pedido escribe el MISMO documento (nunca duplica).
+const PEDIDO_TIMEOUT_MS = 20000;
+let _pedidoPending = null; // {sig, id} del último intento sin confirmar
 async function enviarPedido(){
   const solicitante=(document.getElementById("solicitante").value||"").trim();
   const fecha=document.getElementById("fecha").value||"";
@@ -2252,8 +2260,27 @@ async function enviarPedido(){
       leido:false
     };
     console.log("Enviando pedido a Firestore...", {user: firebase.auth().currentUser?.uid||"sin auth", items:items.length});
-    await window._pedidoDB
-      .collection("insumos_cima").doc("solicitudes_log").collection("items").add(payload);
+    const col = window._pedidoDB.collection("insumos_cima").doc("solicitudes_log").collection("items");
+    const sig = JSON.stringify(Object.assign({}, payload, {timestamp:null}));
+    if(!_pedidoPending || _pedidoPending.sig !== sig) _pedidoPending = {sig, id: col.doc().id};
+    const ref = col.doc(_pedidoPending.id);
+    try{
+      let timer;
+      await Promise.race([
+        ref.set(payload),
+        new Promise((_,rej)=>{ timer=setTimeout(()=>rej(Object.assign(new Error("timeout"),{code:"pedido-timeout"})), PEDIDO_TIMEOUT_MS); })
+      ]).finally(()=>clearTimeout(timer));
+    }catch(e){
+      // Reintento de un pedido que en realidad YA había llegado: las reglas
+      // rechazan la segunda escritura (ya no es "crear"). Si el documento
+      // existe, el pedido está enviado — no es un error.
+      let yaEnviado = false;
+      if(e.code === "permission-denied"){
+        try{ yaEnviado = (await ref.get()).exists; }catch(_){}
+      }
+      if(!yaEnviado) throw e;
+    }
+    _pedidoPending = null;
     console.log("Pedido enviado OK");
     toast("✓ Pedido enviado correctamente");
   } catch(e) {
@@ -2262,7 +2289,10 @@ async function enviarPedido(){
     let title = "No se pudo enviar el pedido";
     let desc  = "";
 
-    if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
+    if (e.code === "pedido-timeout") {
+      title = "Sin confirmación del servidor";
+      desc  = "La conexión está muy lenta o se cortó, y no llegó la confirmación de que el pedido se haya recibido.\n\nRevisá tu conexión y tocá \"Enviar Pedido\" de nuevo: si ya había llegado, NO se va a duplicar.";
+    } else if (e.code === "permission-denied" || raw.includes("PERMISSION_DENIED")) {
       // "permission-denied" tiene dos causas muy distintas y antes se
       // mostraba siempre el mismo mensaje ("activá el acceso anónimo"), que
       // es incorrecto y confunde al administrador cuando la causa real es
