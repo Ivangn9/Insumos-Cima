@@ -2491,7 +2491,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.3";
+const APP_VERSION = "6.4";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2969,8 +2969,10 @@ function persistCenter(c){
 // renombrado en Stock pero Pedido de Insumos seguía con el nombre viejo
 // porque ESE era, de hecho, el único guardado en Firestore).
 function persistSupplies(rethrow){
-  if(!_dataReady){ console.warn('[Safety] persistSupplies() bloqueado — datos aún cargando'); _warnWriteBlocked(); return Promise.resolve(); }
-  if(!supplies.length){ console.warn('[Safety] persistSupplies() bloqueado — supplies vacío'); return Promise.resolve(); }
+  // Bloqueado: con rethrow, rechazar — devolver Promise.resolve() hacía que
+  // saveSupply() mostrara "✓ Insumo actualizado" aunque no se guardara nada.
+  if(!_dataReady){ console.warn('[Safety] persistSupplies() bloqueado — datos aún cargando'); if(rethrow) return Promise.reject(new Error('sin conexión con el servidor, los datos todavía se están sincronizando')); _warnWriteBlocked(); return Promise.resolve(); }
+  if(!supplies.length){ console.warn('[Safety] persistSupplies() bloqueado — supplies vacío'); return rethrow ? Promise.reject(new Error('catálogo vacío')) : Promise.resolve(); }
   return _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(function(e){
     if(rethrow) throw e;
     toast("⚠️ Error guardando");
@@ -5589,11 +5591,19 @@ function startListeners(){
   // Defensa contra doble suscripción (re-login, reintentos de acceso):
   // siempre cancelar listeners previos antes de crear nuevos
   _stopListeners();
-  _unsubSupplies = _db.collection(DB_COL).doc("supplies").onSnapshot(
+  // includeMetadataChanges: con el cache offline activo, el primer snapshot
+  // llega fromCache. Si el servidor confirma datos IDÉNTICOS al cache, por
+  // defecto Firestore NO emite otro snapshot (solo cambió la metadata) — y
+  // _markLoaded nunca se enteraba de que había datos de servidor: _dataReady
+  // quedaba en false para siempre y TODA escritura se bloqueaba en silencio
+  // desde la segunda vez que se abría la app (bug real reportado: "edito en
+  // Stock, cierro la app y no se guardó nada"). Con este flag llega el
+  // snapshot de confirmación del servidor y se habilitan las escrituras.
+  _unsubSupplies = _db.collection(DB_COL).doc("supplies").onSnapshot({includeMetadataChanges:true},
     snap=>_applySuppliesSnapshot(snap),
     e=>{ console.error("[Listener supplies]",e); toast("⚠️ Error cargando insumos: "+(e.message||e)); });
 
-  _unsubGN = _db.collection(DB_COL).doc("center_GN").onSnapshot(snap=>{
+  _unsubGN = _db.collection(DB_COL).doc("center_GN").onSnapshot({includeMetadataChanges:true},snap=>{
     if(snap.exists){
       const prevMovements=cs.GN&&cs.GN.movements; // preservar entre snapshots del doc (no viene en migrados)
       cs.GN=snap.data();
@@ -5625,7 +5635,7 @@ function startListeners(){
       if(currentTab==="solicitudes")renderSolicitudes();
     },e=>console.warn("solicitudes error:",e));
 
-  _unsubSarm = _db.collection(DB_COL).doc("center_Sarmiento").onSnapshot(snap=>{
+  _unsubSarm = _db.collection(DB_COL).doc("center_Sarmiento").onSnapshot({includeMetadataChanges:true},snap=>{
     if(snap.exists){
       const prevMovements=cs.Sarmiento&&cs.Sarmiento.movements;
       cs.Sarmiento=snap.data();
