@@ -2491,7 +2491,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.4";
+const APP_VERSION = "6.5";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2896,13 +2896,15 @@ let cs = {GN:{stock:{},movements:[],lotes:{}},Sarmiento:{stock:{},movements:[],l
 
 // ─── Data-ready guard ────────────────────────────────────────────────────────
 // Tracks which listeners have fired at least once with real Firestore data.
-// persist() is blocked until all three have loaded to prevent writing empty
-// defaults over real data during the startup race window.
+// Lo que todavía escribe a partir de la memoria local (respaldo diario,
+// edición de lotes) espera a que los tres hayan cargado del servidor. Las
+// escrituras de catálogo y stock ya no dependen de esto: son transacciones
+// que leen el dato fresco del servidor (_txnSupplies / _txnCenter).
 let _loadedFlags = {supplies:false, GN:false, Sarmiento:false};
 let _dataReady = false;
 function _markLoaded(key, snap){
   // Solo datos confirmados por el SERVIDOR habilitan escrituras — el cache
-  // offline sirve para renderizar rápido pero nunca para autorizar persist().
+  // offline sirve para renderizar rápido pero nunca para autorizar escrituras.
   // La regla vive acá para que ningún listener futuro pueda olvidarla.
   if(snap && snap.metadata && snap.metadata.fromCache) return;
   _loadedFlags[key]=true;
@@ -2911,73 +2913,71 @@ function _markLoaded(key, snap){
     console.log('[Safety] Datos cargados — escrituras habilitadas');
   }
 }
-// Aviso VISIBLE cuando una escritura se bloquea: el usuario debe saber que su
-// cambio no se guardó, no solo la consola
-function _warnWriteBlocked(){
-  toast("⚠️ Sin conexión con el servidor — el cambio NO se guardó. Reintentá cuando vuelva la señal.");
-}
-
-// ─── Persist queue ────────────────────────────────────────────────────────────
-// Serializes all writes so rapid successive calls don't race each other.
-// _persistQ (la cola compartida) SIEMPRE se auto-sana a un estado resuelto —
-// así una escritura fallida no traba las siguientes. Pero el PRÓPIO llamador
-// de _enqueue() sí tiene que enterarse de si SU escritura falló: devolver
-// _persistQ (ya "sanado") acá hacía que todo `await _enqueue(...)` resolviera
-// como éxito aunque el write real hubiera fallado — un caller con try/catch
-// (ej. applyImport) nunca veía el error, mostraba "✓ actualizado" y cerraba
-// el modal aunque Firestore hubiera rechazado el guardado.
-let _persistQ = Promise.resolve();
-function _enqueue(fn){
-  const result = _persistQ.then(fn);
-  _persistQ = result.catch(e=>console.warn('[Persist]',e));
-  return result;
-}
-
-// Si el centro ya está migrado a subcolección, cs[c].movements sigue poblado
-// EN MEMORIA (lo alimenta el listener de la subcolección, para que renderMovimientos
-// y compañía sigan funcionando igual) — pero NUNCA hay que escribirlo de vuelta
-// en el documento padre, o se reintroduciría el array embebido en cada persist().
-function _centerPayload(c){
-  if(!c) return c;
-  if(c.movementsMigrated){
-    const copy={}; Object.keys(c).forEach(k=>{ if(k!=='movements') copy[k]=c[k]; });
-    return copy;
-  }
-  return c;
-}
-function persist(){
-  if(!_dataReady){ console.warn('[Safety] persist() bloqueado — datos aún cargando'); _warnWriteBlocked(); return Promise.resolve(); }
-  if(!supplies.length){ console.warn('[Safety] persist() bloqueado — supplies vacío'); return Promise.resolve(); }
-  return _enqueue(()=>{
-    const batch = _db.batch();
-    batch.set(_db.collection(DB_COL).doc("supplies"), {data: supplies, suppliers: suppliers});
-    batch.set(_db.collection(DB_COL).doc("center_GN"), _centerPayload(cs.GN));
-    batch.set(_db.collection(DB_COL).doc("center_Sarmiento"), _centerPayload(cs.Sarmiento));
-    return batch.commit().catch(e=>toast("⚠️ Error guardando: "+e.message));
+// ─── Guardado del catálogo (insumos + proveedores) ───────────────────────────
+// TODA escritura del doc "supplies" pasa por _txnSupplies(). Antes se
+// reescribía el array completo desde la memoria local (persist() /
+// persistSupplies()): si otro dispositivo había cambiado OTRO insumo y este
+// todavía no lo había recibido, ese cambio se pisaba en silencio. Peor:
+// persist() reescribía de paso los documentos de stock de AMBOS centros con
+// lo que hubiera en memoria, pudiendo borrar movimientos recién registrados
+// desde otro dispositivo — solo por cambiar un precio o un proveedor.
+// Ahora: transacción que lee el catálogo FRESCO del servidor, aplica sobre esa
+// copia solo el cambio pedido (fn) y escribe de forma atómica. Sin conexión
+// falla en el acto (nunca queda un "guardado" a medias) y el error llega al
+// llamador, que recién entonces avisa éxito o error.
+// fn(data) recibe {supplies,suppliers} frescos y los modifica en el lugar;
+// puede lanzar un error para abortar. Firestore puede reintentar la
+// transacción, así que fn NO debe tener efectos fuera de `data`.
+const SUPPLIES_MAX_KB=950;
+function _txnSupplies(fn){
+  const ref=_db.collection(DB_COL).doc("supplies");
+  return _db.runTransaction(function(txn){
+    return txn.get(ref).then(function(snap){
+      const raw=snap.exists?snap.data():null;
+      // Nunca escribir un catálogo armado desde cero: si el servidor no
+      // devuelve datos, algo anda mal y escribir arrasaría con todo.
+      if(!raw||!Array.isArray(raw.data)||!raw.data.length)
+        throw Object.assign(new Error("no se pudo leer el catálogo del servidor"),{code:"supplies-missing"});
+      const data={supplies:JSON.parse(JSON.stringify(raw.data)),suppliers:JSON.parse(JSON.stringify(raw.suppliers||[]))};
+      // Mismo criterio que _applySuppliesSnapshot: los insumos del catálogo
+      // base que falten en el doc se agregan (persist() hacía lo mismo).
+      buildDefaultSupplies().forEach(function(def){
+        if(!data.supplies.find(function(s){return s.id===def.id;})) data.supplies.push(def);
+      });
+      fn(data);
+      const payload={data:data.supplies,suppliers:data.suppliers};
+      const kb=Math.round(JSON.stringify(payload).length/1024);
+      if(kb>SUPPLIES_MAX_KB)
+        throw Object.assign(new Error("el catálogo ocuparía ~"+kb+"KB y supera el límite de 1MB de Firestore"),{code:"supplies-too-large"});
+      txn.set(ref,payload);
+      return data;
+    });
+  }).then(function(data){
+    supplies=data.supplies; suppliers=data.suppliers;
+    return data;
   });
 }
-function persistCenter(c){
-  if(!_dataReady){ console.warn('[Safety] persistCenter() bloqueado — datos aún cargando'); _warnWriteBlocked(); return Promise.resolve(); }
-  const key = c==="GN"?"center_GN":"center_Sarmiento";
-  return _enqueue(()=>_db.collection(DB_COL).doc(key).set(_centerPayload(cs[c])).catch(e=>toast("⚠️ Error guardando")));
+// Busca un insumo en la copia fresca de la transacción — si otra persona lo
+// borró mientras tanto, aborta en vez de recrearlo a medias.
+function _txnSupply(data,id){
+  const s=data.supplies.find(function(x){return x.id===id;});
+  if(!s) throw Object.assign(new Error("el insumo ya no existe en el servidor"),{code:"supply-gone"});
+  return s;
 }
-// rethrow=true: propaga el error al llamador (await persistSupplies(true))
-// en vez de tragárselo acá — lo usa saveSupply() para poder revertir el
-// cambio en memoria y avisar con claridad si Firestore rechaza el guardado,
-// en vez de mostrar "✓ Guardado" y dejar el dato nuevo visible en pantalla
-// aunque el servidor nunca lo haya recibido (bug real: el insumo se veía
-// renombrado en Stock pero Pedido de Insumos seguía con el nombre viejo
-// porque ESE era, de hecho, el único guardado en Firestore).
-function persistSupplies(rethrow){
-  // Bloqueado: con rethrow, rechazar — devolver Promise.resolve() hacía que
-  // saveSupply() mostrara "✓ Insumo actualizado" aunque no se guardara nada.
-  if(!_dataReady){ console.warn('[Safety] persistSupplies() bloqueado — datos aún cargando'); if(rethrow) return Promise.reject(new Error('sin conexión con el servidor, los datos todavía se están sincronizando')); _warnWriteBlocked(); return Promise.resolve(); }
-  if(!supplies.length){ console.warn('[Safety] persistSupplies() bloqueado — supplies vacío'); return rethrow ? Promise.reject(new Error('catálogo vacío')) : Promise.resolve(); }
-  return _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(function(e){
-    if(rethrow) throw e;
-    toast("⚠️ Error guardando");
-  }));
+// Mensaje de error unificado para cualquier guardado: siempre deja claro
+// que el cambio NO quedó guardado, y por qué cuando se sabe.
+function _saveErrMsg(e){
+  const code=(e&&e.code)||'';
+  if(code==='permission-denied') return "⚠️ No se guardó: tu usuario no tiene permiso de escritura.";
+  if(code==='unavailable'||code==='deadline-exceeded'||code==='cancelled'||code==='failed-precondition')
+    return "⚠️ Sin conexión con el servidor — el cambio NO se guardó. Reintentá cuando vuelva la señal.";
+  return "⚠️ No se guardó: "+((e&&e.message)||e);
 }
+// Candado contra doble toque: un segundo click en "Guardar" mientras el
+// primero sigue en vuelo duplicaba movimientos/registros.
+const _busy=new Set();
+function _lock(key){ if(_busy.has(key)) return false; _busy.add(key); return true; }
+function _unlock(key){ _busy.delete(key); }
 
 let activeCenter=null, activeCat="Todos", chartDays=7, _charts={}, currentTab="inventario";
 let chartCenter="GN", chartCenter2="GN";
@@ -3471,13 +3471,17 @@ function saveEditSupply(){
   const unidadesPorCaja=presentacion==="caja"?(parseInt(document.getElementById("editUnidadesPorCaja").value)||1):1;
   const pedidoFormatos=Array.from(_editFmts);
   if(!name){toast("⚠️ El nombre es obligatorio");return;}
-  const s=supplies.find(x=>x.id===id); if(!s)return;
-  Object.assign(s,{name,code,unit,category,presentacion,unidadesPorCaja,pedidoFormatos});
-  persist();
-  closeEditSupplyModal();
-  renderGestion();
-  if(currentTab==="inventario")renderInventario();
-  toast("✓ Insumo actualizado");
+  if(!supplies.find(x=>x.id===id))return;
+  if(!_lock('editSupply'))return;
+  _txnSupplies(function(d){
+    Object.assign(_txnSupply(d,id),{name,code,unit,category,presentacion,unidadesPorCaja,pedidoFormatos});
+  }).then(function(){
+    closeEditSupplyModal();
+    renderGestion();
+    if(currentTab==="inventario")renderInventario();
+    toast("✓ Insumo actualizado");
+  }).catch(function(e){ console.warn('[saveEditSupply]',e); toast(_saveErrMsg(e)); })
+    .finally(function(){ _unlock('editSupply'); });
 }
 
 // ═══ Corrección masiva de nombres y códigos (admin) ═══════════════════════════
@@ -3700,29 +3704,28 @@ async function applyImport(){
   const exceptIds=new Set(todo.map(r=>r.targetId));
   const used=_impUsedCodes(exceptIds);
   todo.forEach(r=>{ if(r.c!=null) used.add(String(r.c).trim()); });
-  let n=0;
+  // Los cambios se calculan acá (sin tocar `supplies` en memoria) y se aplican
+  // sobre la copia fresca del servidor dentro de _txnSupplies — si el guardado
+  // falla, la pantalla no queda mostrando nombres/códigos que nunca se guardaron.
+  const changes=[];
   todo.forEach(r=>{
     const s=supplies.find(x=>x.id===r.targetId); if(!s) return;
-    s.name=r.b;
     // Si el Excel no trae código (r.c==null) y el insumo YA tiene uno, se
     // conserva tal cual — antes acá SIEMPRE se generaba uno nuevo al azar,
     // así que aplicar esta corrección dos veces (ej. reintentando tras un
     // error) le barajaba el código a los ~84 insumos sin cambio de código
     // en cada corrida, aunque ya tuvieran uno bien asignado de antes.
-    s.code=(r.c!=null?String(r.c).trim():(s.code||_impGenCode(used)));
-    n++;
+    changes.push({id:r.targetId,name:r.b,code:(r.c!=null?String(r.c).trim():(s.code||_impGenCode(used)))});
   });
-  // Aviso preventivo: mismo tipo de falla que tuvo el historial de movimientos
-  // antes de migrarlo a subcolección (V5.0) — un doc de Firestore no puede
-  // superar 1024KB. No bloquea el intento (podría entrar igual), pero deja
-  // el aviso ANTES de un error críptico si está cerca del límite.
-  let _impApproxKB=0;
-  try{ _impApproxKB=Math.round(JSON.stringify({data:supplies,suppliers}).length/1024); }catch(e){}
-  if(_impApproxKB>900){
-    toast(`⚠️ El catálogo pesa ~${_impApproxKB}KB, cerca del límite de 1024KB de Firestore por documento — el guardado podría fallar por tamaño.`);
-  }
+  const n=changes.length;
   try{
-    await _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(e=>{throw e;}));
+    // El tope de tamaño (1MB por documento) lo controla _txnSupplies antes de escribir.
+    await _txnSupplies(function(d){
+      changes.forEach(function(c){
+        const s=d.supplies.find(x=>x.id===c.id); if(!s) return;
+        s.name=c.name; s.code=c.code;
+      });
+    });
     _auditLog('supply_bulk_correction',`Corrección masiva: ${n} insumo(s) (nombre/código)`,null,{count:n});
     toast(`✓ ${n} insumo(s) actualizados y sincronizados`);
     closeImportModal();
@@ -4093,26 +4096,41 @@ async function _piApply(){
     if(!nm){ toast('⚠️ Escribí el nombre del nuevo proveedor o elegí uno de la lista'); return; }
     const ex=suppliers.find(s=>_impNorm(s.name)===_impNorm(nm));
     if(ex){ provId=ex.id; provName=ex.name; }
-    else { provId='sup_'+Date.now(); provName=nm; suppliers.push({id:provId,name:nm}); newSupplierCreated=true; }
+    else { provId='sup_'+Date.now(); provName=nm; newSupplierCreated=true; } // se crea dentro de la transacción
   } else if(_piSupId){
     const ex=suppliers.find(s=>s.id===_piSupId);
     if(ex){ provId=ex.id; provName=ex.name; }
   }
   const btn=document.getElementById('piApplyBtn'); if(btn) btn.disabled=true;
   const today=new Date().toISOString().slice(0,10);
-  let n=0; const changes=[];
+  // Se calcula sobre la memoria solo para saber qué cambia; lo que se guarda
+  // se aplica sobre la copia fresca del servidor dentro de _txnSupplies.
+  const pending=[];
   todo.forEach(r=>{
     const s=supplies.find(x=>x.id===r.targetId); if(!s) return;
-    const old=s.price||0;
-    if(Math.abs(old-r.price)<0.005) return;
-    s.price=r.price;
-    _pushPriceHistory(s, r.price, today, {origin:'import', proveedorName:provName||('Import: '+_piFileName), proveedorId:provId||undefined});
-    if(provId){ s.proveedorId=provId; s.proveedorName=provName; }
-    n++; changes.push({name:s.name, old:old, nuevo:r.price});
+    if(Math.abs((s.price||0)-r.price)<0.005) return;
+    pending.push({id:r.targetId,price:r.price});
   });
-  if(!n && !newSupplierCreated){ toast('Los precios ya estaban actualizados'); if(btn) btn.disabled=false; return; }
+  if(!pending.length && !newSupplierCreated){ toast('Los precios ya estaban actualizados'); if(btn) btn.disabled=false; return; }
+  let n=0; let changes=[];
   try{
-    await _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(e=>{throw e;}));
+    await _txnSupplies(function(d){
+      n=0; changes=[]; // la transacción puede reintentarse: recalcular desde cero
+      if(newSupplierCreated && !d.suppliers.find(x=>x.id===provId)){
+        // Si otra persona creó un proveedor con el mismo nombre mientras tanto, se reutiliza
+        const ex=d.suppliers.find(x=>_impNorm(x.name)===_impNorm(provName));
+        if(ex) provId=ex.id; else d.suppliers.push({id:provId,name:provName});
+      }
+      pending.forEach(function(p){
+        const s=d.supplies.find(x=>x.id===p.id); if(!s) return;
+        const old=s.price||0;
+        if(Math.abs(old-p.price)<0.005) return;
+        s.price=p.price;
+        _pushPriceHistory(s, p.price, today, {origin:'import', proveedorName:provName||('Import: '+_piFileName), proveedorId:provId||undefined});
+        if(provId){ s.proveedorId=provId; s.proveedorName=provName; }
+        n++; changes.push({name:s.name, old:old, nuevo:p.price});
+      });
+    });
     _auditLog('price_bulk_import','Import precios: '+n+' insumo(s)'+(provName?(' · '+provName):'')+(newSupplierCreated?' · proveedor NUEVO':'')+' · archivo '+_piFileName,null,{count:n,proveedor:provName,newSupplier:newSupplierCreated,changes:changes.slice(0,50)});
     toast('✓ '+n+' precio(s) actualizados'+(newSupplierCreated?' · proveedor creado':'')+' y sincronizados');
     closePriceImport();
@@ -4603,28 +4621,44 @@ function closeCostosDetail(){
 }
 
 function confirmCostosPrice(){
-  const s=supplies.find(x=>x.id===_costosDetailId); if(!s)return;
+  const id=_costosDetailId;
+  if(!supplies.find(x=>x.id===id))return;
   const val=parseFloat(document.getElementById("costosPriceInput").value)||0;
   if(val<=0){toast("⚠️ Ingresá un precio válido");return;}
   const today=new Date().toISOString().slice(0,10);
-  s.price=val;
-  _pushPriceHistory(s, val, today, {origin:'manual'});
-  persist();
-  toast("✓ Precio actualizado: $"+fmt(val));
-  openCostosDetail(_costosDetailId);
+  _txnSupplies(function(d){
+    const s=_txnSupply(d,id);
+    s.price=val;
+    _pushPriceHistory(s, val, today, {origin:'manual'});
+  }).then(function(){
+    toast("✓ Precio actualizado: $"+fmt(val));
+    if(_costosDetailId===id) openCostosDetail(id);
+  }).catch(function(e){ console.warn('[confirmCostosPrice]',e); toast(_saveErrMsg(e)); });
+}
+// Ubica un registro del historial de precios en la copia FRESCA del servidor:
+// por `ts` (único por registro) y, en registros viejos sin ts, por
+// fecha+precio+origen — nunca solo por índice, que puede haber cambiado si
+// otro dispositivo agregó un precio mientras tanto.
+function _findPriceHistIdx(hist,ref){
+  if(!hist||!ref) return -1;
+  if(ref.ts) return hist.findIndex(function(h){return h.ts===ref.ts;});
+  return hist.findIndex(function(h){return !h.ts&&h.date===ref.date&&h.price===ref.price&&(h.origin||'')===(ref.origin||'');});
 }
 function deleteCostosHist(idx){
   openConfirm("Eliminar registro","¿Eliminar este registro de precio?",()=>{
-    const s=supplies.find(x=>x.id===_costosDetailId); if(!s)return;
-    s.priceHistory.splice(idx,1);
-    if(s.priceHistory.length===0||s.price===0){
-      s.price=s.priceHistory.length?s.priceHistory[0].price:0;
-    } else if(idx===0){
-      s.price=s.priceHistory.length?s.priceHistory[0].price:0;
-    }
-    persist();
-    toast("✓ Registro eliminado");
-    openCostosDetail(_costosDetailId);
+    const id=_costosDetailId;
+    const local=supplies.find(x=>x.id===id); if(!local||!local.priceHistory)return;
+    const ref=local.priceHistory[idx]; if(!ref)return;
+    _txnSupplies(function(d){
+      const s=_txnSupply(d,id);
+      const i=_findPriceHistIdx(s.priceHistory,ref);
+      if(i<0) throw Object.assign(new Error("ese registro de precio ya no existe en el servidor"),{code:"hist-gone"});
+      s.priceHistory.splice(i,1);
+      if(i===0||!s.price) s.price=s.priceHistory.length?s.priceHistory[0].price:0;
+    }).then(function(){
+      toast("✓ Registro eliminado");
+      if(_costosDetailId===id) openCostosDetail(id);
+    }).catch(function(e){ console.warn('[deleteCostosHist]',e); toast(_saveErrMsg(e)); });
   });
 }
 function editCostosHistInline(idx){
@@ -4640,19 +4674,37 @@ function editCostosHistInline(idx){
     </span>`;
 }
 function saveCostosHistEdit(idx){
-  const s=supplies.find(x=>x.id===_costosDetailId); if(!s)return;
+  const id=_costosDetailId;
+  const local=supplies.find(x=>x.id===id); if(!local||!local.priceHistory)return;
+  const ref=local.priceHistory[idx]; if(!ref)return;
   const price=parseFloat(document.getElementById("cedit-price-"+idx)?.value)||0;
   const date=(document.getElementById("cedit-date-"+idx)?.value||"").trim();
   if(price<=0){toast("⚠️ Ingresá un precio válido");return;}
-  s.priceHistory[idx].price=price;
-  if(date)s.priceHistory[idx].date=date;
-  if(idx===0)s.price=price;
-  persist();
-  toast("✓ Registro actualizado");
-  openCostosDetail(_costosDetailId);
+  _txnSupplies(function(d){
+    const s=_txnSupply(d,id);
+    const i=_findPriceHistIdx(s.priceHistory,ref);
+    if(i<0) throw Object.assign(new Error("ese registro de precio ya no existe en el servidor"),{code:"hist-gone"});
+    s.priceHistory[i].price=price;
+    if(date)s.priceHistory[i].date=date;
+    if(i===0)s.price=price;
+  }).then(function(){
+    toast("✓ Registro actualizado");
+    if(_costosDetailId===id) openCostosDetail(id);
+  }).catch(function(e){ console.warn('[saveCostosHistEdit]',e); toast(_saveErrMsg(e)); });
 }
-function updateMinStock(id,val){const s=supplies.find(x=>x.id===id);if(s){s.minStock=parseInt(val)||0;persist();}}
-function updateMaxStock(id,val){const s=supplies.find(x=>x.id===id);if(s){s.maxStock=parseInt(val)||0;persist();}}
+// Edición inline de stock mín./máx. (onchange del input): si no se guarda,
+// se re-renderiza para que el input vuelva a mostrar el valor real guardado.
+function _updateSupplyField(id,field,val){
+  if(!supplies.find(x=>x.id===id))return;
+  _txnSupplies(function(d){ _txnSupply(d,id)[field]=val; })
+    .catch(function(e){
+      console.warn('[updateSupplyField]',field,e);
+      toast(_saveErrMsg(e));
+      renderGestion(); if(currentTab==="inventario")renderInventario();
+    });
+}
+function updateMinStock(id,val){_updateSupplyField(id,'minStock',parseInt(val)||0);}
+function updateMaxStock(id,val){_updateSupplyField(id,'maxStock',parseInt(val)||0);}
 
 function renderSuppliersList(){
   const el=document.getElementById("suppliersList"); if(!el)return;
@@ -4709,21 +4761,28 @@ function saveSupplierModal(){
     repTel:(document.getElementById("supRepTel").value||"").trim(),
     repEmail:(document.getElementById("supRepEmail").value||"").trim()
   };
-  if(id){
-    const idx=suppliers.findIndex(x=>x.id===id);
-    if(idx>=0)suppliers[idx]={...suppliers[idx],...data};
-  }else{
-    suppliers.push({id:"sup_"+Date.now(),...data});
-  }
-  persist();
-  document.getElementById("supplierModal").classList.remove("open");
-  renderSuppliersList();
-  toast(id?"✓ Proveedor actualizado":"✓ Proveedor agregado");
+  if(!_lock('supplier'))return;
+  const newId="sup_"+Date.now();
+  _txnSupplies(function(d){
+    if(id){
+      const idx=d.suppliers.findIndex(x=>x.id===id);
+      if(idx<0) throw Object.assign(new Error("el proveedor ya no existe en el servidor"),{code:"supplier-gone"});
+      d.suppliers[idx]={...d.suppliers[idx],...data};
+    }else{
+      d.suppliers.push({id:newId,...data});
+    }
+  }).then(function(){
+    document.getElementById("supplierModal").classList.remove("open");
+    renderSuppliersList();
+    toast(id?"✓ Proveedor actualizado":"✓ Proveedor agregado");
+  }).catch(function(e){ console.warn('[saveSupplierModal]',e); toast(_saveErrMsg(e)); })
+    .finally(function(){ _unlock('supplier'); });
 }
 function removeSupplier(id){
   openConfirm("Quitar proveedor","¿Eliminar este proveedor?",()=>{
-    suppliers=suppliers.filter(x=>x.id!==id);
-    persist();renderSuppliersList();toast("✓ Proveedor eliminado");
+    _txnSupplies(function(d){ d.suppliers=d.suppliers.filter(x=>x.id!==id); })
+      .then(function(){ renderSuppliersList(); toast("✓ Proveedor eliminado"); })
+      .catch(function(e){ console.warn('[removeSupplier]',e); toast(_saveErrMsg(e)); });
   });
 }
 
@@ -4734,9 +4793,11 @@ function pickCenterForTab(c){
 function archiveSupply(id){
   const s=supplies.find(x=>x.id===id);
   openConfirm(`¿Archivar "${s?.name}"?`,"Se ocultará del inventario.",()=>{
-    const f=supplies.find(x=>x.id===id);if(f)f.active=false;
-    _auditLog('supply_archive',`Insumo archivado: "${s?.name}"`);
-    persist();renderGestion();if(currentTab==="inventario")renderInventario();toast("Insumo archivado");
+    _txnSupplies(function(d){ _txnSupply(d,id).active=false; })
+      .then(function(){
+        _auditLog('supply_archive',`Insumo archivado: "${s?.name}"`);
+        renderGestion();if(currentTab==="inventario")renderInventario();toast("Insumo archivado");
+      }).catch(function(e){ console.warn('[archiveSupply]',e); toast(_saveErrMsg(e)); });
   });
 }
 
@@ -4881,7 +4942,7 @@ function onLoteSelectChange(){
 }
 // ─── Helpers de concurrencia (Firestore runTransaction) ───────────────────────
 // runTransaction requiere ida y vuelta al servidor: sin conexión, falla en el
-// acto (no se encola como persist()/batch.set()). Mensaje claro para el usuario.
+// acto (no queda encolada en silencio como un .set() suelto). Mensaje claro.
 function _txnErrorMsg(e,fallback){
   var code=(e&&e.code)||'';
   if(code==='unavailable'||code==='deadline-exceeded'||code==='cancelled')
@@ -5043,11 +5104,11 @@ function saveMovimiento(){
   const fechaVenc=document.getElementById("movFechaVenc")?.value||"";
   const loteSelectId=document.getElementById("movLoteSelect")?.value||"fefo";
 
-  if(_movType==="entrada"&&unitPrice>0){
-    s.price=unitPrice;
-    _pushPriceHistory(s, unitPrice, date, {origin:'entrada', proveedorName:proveedor?.name||'', proveedorId:proveedorId||undefined});
-    persistSupplies();
-  }
+  // El precio de la entrada se guarda recién DESPUÉS de que el movimiento se
+  // confirma (más abajo) — antes se guardaba primero, así que si el
+  // movimiento fallaba (ej. sin señal) quedaba el precio nuevo sin la entrada.
+  const movType=_movType; // fijarlo: _movType es global y puede cambiar si se reabre el modal
+  if(!_lock('mov'))return;
 
   // Capturar presentación si es entrada
   let presentacion=null;
@@ -5064,10 +5125,10 @@ function saveMovimiento(){
   const movId="mov_"+Date.now();
   const center=activeCenter;
   let salidaDetail=""; // se completa dentro de la transacción (solo aplica a salida)
-  const mov={id:movId,supplyId,supplyName:s.name,type:_movType,qty,date,
+  const mov={id:movId,supplyId,supplyName:s.name,type:movType,qty,date,
     time:new Date().toTimeString().slice(0,5),note,
     ...(proveedorId&&{proveedorId,proveedorName:proveedor?.name||""}),
-    ...(fechaVenc&&_movType==="entrada"&&{fechaVenc}),
+    ...(fechaVenc&&movType==="entrada"&&{fechaVenc}),
     ...(presentacion&&{presentacion}),
     ...(currentUser?.email&&{user:currentUser.email})
   };
@@ -5075,21 +5136,22 @@ function saveMovimiento(){
   // se cerraba acá optimistamente, así que un rechazo (ej. stock insuficiente)
   // dejaba al usuario sin el modal para corregir la cantidad.
   _txnCenter(center,function(data){
-    if(_movType==="entrada"&&fechaVenc){
+    delete mov.lotesConsumidos; salidaDetail=""; // la transacción puede reintentarse
+    if(movType==="entrada"&&fechaVenc){
       _lotesEntrada(data.lotes,supplyId,qty,fechaVenc,presentacion,date);
-    } else if(_movType==="salida"){
+    } else if(movType==="salida"){
       const r=_lotesSalida(data.lotes,supplyId,qty,loteSelectId);
       salidaDetail=r.detail;
       if(r.consumedLotes.length) mov.lotesConsumidos=r.consumedLotes;
     }
     const stockAntes=data.stock[supplyId]||0;
-    if(_movType==="salida"&&qty>stockAntes){
+    if(movType==="salida"&&qty>stockAntes){
       // Aborta la transacción — antes solo avisaba con un toast y dejaba
       // igual el stock en negativo, lo que después distorsiona reportes,
       // gráficas y el indicador de stock bajo.
       throw Object.assign(new Error("Stock insuficiente: hay "+stockAntes+" "+(s.unit||"ud")+" y se quiere registrar una salida de "+qty+"."),{code:"stock-insuficiente"});
     }
-    data.stock[supplyId]=(data.stock[supplyId]||0)+(_movType==="entrada"?qty:-qty);
+    data.stock[supplyId]=(data.stock[supplyId]||0)+(movType==="entrada"?qty:-qty);
     _movPush(data,mov);
     return data;
   }).then(function(data){
@@ -5097,16 +5159,27 @@ function saveMovimiento(){
     cs[center].stock=data.stock;
     if(data.movements) cs[center].movements=data.movements; // legacy: migrado lo maneja el listener de la subcolección
     cs[center].lotes=data.lotes;
-    const toastDetail=_movType==="entrada"?(fechaVenc?" · Vence "+fmtDate(fechaVenc):""):salidaDetail;
-    _auditLog("mov_"+_movType,(_movType==="entrada"?"Entrada":"Salida")+": "+qty+" "+(s.unit||"ud")+" de \""+s.name+"\" en "+center+toastDetail+(note?" · "+note:""),null,{stock:cs[center].stock[supplyId]});
-    toast("✓ "+(_movType==="entrada"?"Entrada":"Salida")+" registrada: "+qty+" "+s.unit+" de "+s.name+toastDetail);
+    const toastDetail=movType==="entrada"?(fechaVenc?" · Vence "+fmtDate(fechaVenc):""):salidaDetail;
+    _auditLog("mov_"+movType,(movType==="entrada"?"Entrada":"Salida")+": "+qty+" "+(s.unit||"ud")+" de \""+s.name+"\" en "+center+toastDetail+(note?" · "+note:""),null,{stock:cs[center].stock[supplyId]});
+    toast("✓ "+(movType==="entrada"?"Entrada":"Salida")+" registrada: "+qty+" "+s.unit+" de "+s.name+toastDetail);
     if(navigator.vibrate)navigator.vibrate([8,50,8]);
     renderCurrentTab();
     updateVencBadge();
+    // Precio de compra de la entrada: recién ahora, con el movimiento ya guardado.
+    if(movType==="entrada"&&unitPrice>0){
+      _txnSupplies(function(d){
+        const sup=_txnSupply(d,supplyId);
+        sup.price=unitPrice;
+        _pushPriceHistory(sup, unitPrice, date, {origin:'entrada', proveedorName:proveedor?.name||'', proveedorId:proveedorId||undefined});
+      }).catch(function(e){
+        console.warn('[saveMovimiento] precio',e);
+        toast("⚠️ La entrada se registró, pero el precio NO se guardó: "+_saveErrMsg(e).replace(/^⚠️ /,''));
+      });
+    }
   }).catch(function(e){
     console.warn("Error al guardar movimiento:",e);
-    toast(e&&e.code==="stock-insuficiente"?"⚠️ "+e.message:_txnErrorMsg(e,"⚠️ Error al guardar. Intentá de nuevo."));
-  });
+    toast(e&&e.code==="stock-insuficiente"?"⚠️ "+e.message:_saveErrMsg(e));
+  }).finally(function(){ _unlock('mov'); });
 }
 
 // ─── Traslado de stock entre sucursales ────────────────────────────────────
@@ -5195,11 +5268,19 @@ function saveTraslado(){
   const stockActual=(cs[from]?.stock||{})[supplyId]||0;
   if(qty>stockActual){toast("⚠️ Stock insuficiente en "+((BRAND_THEMES[from]&&BRAND_THEMES[from].nombre)||from)+": hay "+stockActual+" disponibles");return;}
 
+  if(!_lock('traslado'))return;
   const ts=Date.now();
   const movIdOut="mov_"+ts+"_out", movIdIn="mov_"+ts+"_in";
   const time=new Date().toTimeString().slice(0,5);
-  document.getElementById("trasladoModal").classList.remove("open");
+  // El modal se cierra recién si la transacción sale bien (igual que en
+  // saveMovimiento) — si falla, el usuario puede corregir y reintentar.
   _txnTransfer(from,to,function(fromData,toData){
+    // Validación con el stock FRESCO del servidor: el chequeo de arriba usa la
+    // memoria local, que puede estar desactualizada si otro dispositivo acaba
+    // de registrar una salida — sin esto el origen podía quedar en negativo.
+    const disponible=fromData.stock[supplyId]||0;
+    if(qty>disponible)
+      throw Object.assign(new Error("Stock insuficiente en "+from+": hay "+disponible+" disponibles."),{code:"stock-insuficiente"});
     const r=_lotesSalida(fromData.lotes,supplyId,qty,loteSelectId);
     fromData.stock[supplyId]=(fromData.stock[supplyId]||0)-qty;
     if(r.consumedLotes.length){
@@ -5217,6 +5298,7 @@ function saveTraslado(){
     _movPush(toData,movIn);
     return {from:fromData,to:toData};
   }).then(function(result){
+    document.getElementById("trasladoModal").classList.remove("open");
     cs[from].stock=result.from.stock; if(result.from.movements)cs[from].movements=result.from.movements; cs[from].lotes=result.from.lotes;
     cs[to].stock=result.to.stock; if(result.to.movements)cs[to].movements=result.to.movements; cs[to].lotes=result.to.lotes;
     _auditLog("mov_traslado","Traslado: "+qty+" "+(s.unit||"ud")+" de \""+s.name+"\" de "+from+" a "+to+(note?" · "+note:""),null,
@@ -5227,8 +5309,8 @@ function saveTraslado(){
     updateVencBadge();
   }).catch(function(e){
     console.warn("Error al guardar traslado:",e);
-    toast(_txnErrorMsg(e,"⚠️ Error al guardar el traslado. Intentá de nuevo."));
-  });
+    toast(e&&e.code==="stock-insuficiente"?"⚠️ "+e.message:_saveErrMsg(e));
+  }).finally(function(){ _unlock('traslado'); });
 }
 
 // ─── Modal Agregar ────────────────────────────────────────────────────────────
@@ -5304,19 +5386,29 @@ function saveSupply(){
   // confirmación real antes de avisar éxito, y si falla, se revierte el
   // cambio en memoria (para que Stock tampoco mienta) y se avisa con
   // claridad en vez de un toast que puede pasar desapercibido.
+  //
+  // NOTA (V6.5): ahora todo pasa por _txnSupplies() (lectura fresca del
+  // servidor + escritura atómica), así que tampoco se pisa un cambio que otro
+  // dispositivo haya hecho en OTRO insumo mientras este modal estaba abierto.
+  // La memoria local no se toca hasta que el servidor confirma.
+  if(!_lock('addSupply'))return;
   if(_editId){
     const id=_editId;
     const s=supplies.find(x=>x.id===id);
-    if(!s) return;
+    if(!s){ _unlock('addSupply'); return; }
     const before={name:s.name,code:s.code,price:s.price,category:s.category,unit:s.unit,minStock:s.minStock,presentacion:s.presentacion,unidadesPorCaja:s.unidadesPorCaja,pedidoFormatos:s.pedidoFormatos};
-    Object.assign(s,{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos});
-    persistSupplies(true).then(function(){
+    _txnSupplies(function(d){
+      Object.assign(_txnSupply(d,id),{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos});
+    }).then(function(){
       _auditLog('supply_edit',`Insumo editado: "${name}"`,before,{name,code,price,category});
       toast("✓ Insumo actualizado");
       document.getElementById("addModal").classList.remove("open");
       renderGestion();
       if(currentTab==="inventario")renderInventario();
 
+      // Sin sucursal activa no hay stock que ajustar (antes cs[null] tiraba
+      // un error DESPUÉS de guardar y se avisaba "no se pudo guardar").
+      if(!center||!cs[center]) return;
       const prevStock=cs[center].stock[id]||0;
       if(initStk!==prevStock){
         _txnCenter(center,function(data){
@@ -5329,21 +5421,21 @@ function saveSupply(){
           if(currentTab==="inventario")renderCurrentTab();
         }).catch(function(e){
           console.warn('Error ajustando stock:',e);
-          toast("⚠️ Los datos del insumo se guardaron, pero no se pudo ajustar el stock: "+(e.message||e));
+          toast("⚠️ Los datos del insumo se guardaron, pero el stock NO se ajustó: "+_saveErrMsg(e).replace(/^⚠️ /,''));
         });
       }
     }).catch(function(e){
-      Object.assign(s,before);
       console.warn('[saveSupply] Error al guardar:',e);
-      toast('⚠️ No se pudo guardar el insumo — el cambio NO se aplicó: '+(e.message||e));
-    });
+      toast(_saveErrMsg(e));
+    }).finally(function(){ _unlock('addSupply'); });
     return;
   }
 
   const id="cus_"+Date.now();
-  const newSupply={id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos};
-  supplies.push(newSupply);
-  persistSupplies(true).then(function(){
+  _txnSupplies(function(d){
+    if(d.supplies.find(x=>x.id===id)) return; // reintento de la misma transacción
+    d.supplies.push({id,name,code:code||"USR-"+d.supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos});
+  }).then(function(){
     _auditLog('supply_add',`Insumo creado: "${name}" (${code||'sin código'}) — precio: $${price}`);
     toast("✓ Insumo agregado");
     document.getElementById("addModal").classList.remove("open");
@@ -5364,16 +5456,14 @@ function saveSupply(){
         if(data.movements) cs[c].movements=data.movements;
         if(c===center){ updateCenterStats(); if(currentTab==="inventario")renderCurrentTab(); }
       }).catch(function(e){
-      console.warn('Error inicializando stock del nuevo insumo en',c,e);
-      toast("⚠️ El insumo se creó, pero no se pudo inicializar el stock en "+c+": "+(e.message||e));
-    });
+        console.warn('Error inicializando stock del nuevo insumo en',c,e);
+        toast("⚠️ El insumo se creó, pero el stock inicial en "+c+" NO se guardó: "+_saveErrMsg(e).replace(/^⚠️ /,''));
+      });
     });
   }).catch(function(e){
-    const idx=supplies.indexOf(newSupply);
-    if(idx>=0) supplies.splice(idx,1);
     console.warn('[saveSupply] Error al crear:',e);
-    toast('⚠️ No se pudo guardar el insumo nuevo — no se creó: '+(e.message||e));
-  });
+    toast(_saveErrMsg(e));
+  }).finally(function(){ _unlock('addSupply'); });
 }
 
 // ─── Confirm ─────────────────────────────────────────────────────────────────
@@ -6936,10 +7026,20 @@ function toggleItemPrep(solId, key){
   const bar=document.getElementById("prep-prog-bar");
   if(txt){txt.textContent=cnt+"/"+tot+" listos";txt.style.color=allDone?"#34c759":"#636366";}
   if(bar){bar.style.width=pct+"%";bar.style.background=allDone?"#34c759":"#0071e3";}
-  // Persist to Firestore
+  // Persist to Firestore — arrayUnion/arrayRemove (no el array entero): si dos
+  // personas tildan ítems del mismo pedido a la vez, ninguna pisa a la otra.
+  const FV=firebase.firestore.FieldValue;
   _db.collection("insumos_cima").doc("solicitudes_log").collection("items")
-    .doc(solId).update({itemsPreparados:s.itemsPreparados})
-    .catch(e=>console.warn("prep save error:",e));
+    .doc(solId).update({itemsPreparados:done?FV.arrayUnion(key):FV.arrayRemove(key)})
+    .catch(function(e){
+      console.warn("prep save error:",e);
+      // Revertir en memoria; el listener de solicitudes re-renderiza con lo real.
+      const i=s.itemsPreparados.indexOf(key);
+      if(done&&i>=0) s.itemsPreparados.splice(i,1);
+      else if(!done&&i<0) s.itemsPreparados.push(key);
+      if(document.getElementById("prow-"+key)) openSolicitudDetalle(solId); // re-dibuja el tilde real
+      toast(_saveErrMsg(e));
+    });
 }
 function exportarSolicitudPDF(id){
   const s=solicitudes.find(x=>x.id===id); if(!s)return;
@@ -7008,23 +7108,38 @@ function marcarTodasLeidas(){
   });
   batch.commit().catch(e=>console.warn(e));
 }
+// Entregar un pedido = descontar stock + marcarlo entregado. Antes eran DOS
+// escrituras separadas (transacción de stock y después .update() del pedido):
+// si la segunda fallaba (señal, app cerrada), el stock quedaba descontado pero
+// el pedido seguía "pendiente", y al reintentar se descontaba OTRA VEZ. Lo
+// mismo si dos personas lo entregaban casi a la vez. Ahora es UNA transacción
+// que lee el pedido y el centro: si el pedido ya figura entregado, aborta sin
+// tocar el stock; si no, descuenta y lo marca entregado de forma atómica.
+// Los IDs de movimiento son fijos por pedido+insumo (no Date.now()), así que
+// tampoco pueden duplicarse.
 function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
   const s=solicitudes.find(x=>x.id===id); if(!s) return;
+  const lockKey='entregar_'+id;
+  if(!_lock(lockKey)) return;
   const center=s.sector;
   const dateStr=new Date().toISOString().split("T")[0];
   const timeStr=new Date().toTimeString().slice(0,5);
-  const updateSolicitud=function(){
-    return _db.collection("insumos_cima").doc("solicitudes_log").collection("items")
-      .doc(id).update({entregado:true,leido:true,fechaEntrega:firebase.firestore.FieldValue.serverTimestamp(),...(recibidoPor&&{recibidoPor}),...(firma&&{firma})})
-      .then(function(){ closePdfViewer(); })
-      .catch(function(e){ console.warn(e); toast("⚠️ Error al actualizar"); });
+  const solRef=_db.collection("insumos_cima").doc("solicitudes_log").collection("items").doc(id);
+  const solUpdate={entregado:true,leido:true,fechaEntrega:firebase.firestore.FieldValue.serverTimestamp(),...(recibidoPor&&{recibidoPor}),...(firma&&{firma})};
+  const onError=function(e){
+    console.warn('[markSolicitudEntregado]',e);
+    if(e&&e.code==='ya-entregado') toast("ℹ️ Este pedido ya estaba entregado — no se volvió a descontar stock");
+    else if(e&&e.code==='sol-gone') toast("⚠️ El pedido ya no existe (¿lo eliminó otra persona?)");
+    else toast(_saveErrMsg(e));
   };
   if(!cs[center]){
-    toast("✓ Pedido marcado como entregado");
-    updateSolicitud();
+    // Sector sin stock propio: solo se marca el pedido.
+    solRef.update(solUpdate)
+      .then(function(){ toast("✓ Pedido marcado como entregado"); closePdfViewer(); })
+      .catch(onError)
+      .finally(function(){ _unlock(lockKey); });
     return;
   }
-  // Pre-computar movimientos con IDs estables antes de la transacción (para dedup en retry)
   const movItems=(s.items||[]).filter(function(item){
     if(!item.id) return false;
     const qty=qtyMap?((qtyMap[item.id]??item.cantidad)||0):(item.cantidad||0);
@@ -7032,34 +7147,46 @@ function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
   }).map(function(item){
     const supply=supplies.find(function(sup){return sup.id===item.id;});
     const qty=qtyMap?((qtyMap[item.id]??item.cantidad)||0):(item.cantidad||0);
-    return {id:"sol_"+Date.now()+"_"+item.id,supplyId:item.id,supplyName:supply.name,
+    return {id:"sol_"+id+"_"+item.id,supplyId:item.id,supplyName:supply.name,
       type:"salida",qty,date:dateStr,time:timeStr,
       note:"Pedido · "+(s.solicitante||"")+(s.equipo?" · "+s.equipo:""),
       ...(currentUser?.email&&{user:currentUser.email})};
   });
-  _txnCenter(center,function(data){
-    movItems.forEach(function(mov){
-      var supplyId=mov.supplyId, qty=mov.qty;
-      data.stock[supplyId]=Math.max(0,(data.stock[supplyId]||0)-qty);
-      if(data.lotes&&data.lotes[supplyId]){
-        var rem=qty;
-        var lotes=data.lotes[supplyId];
-        var consumedLotes=[];
-        lotes.sort(function(a,b){return a.fechaVenc.localeCompare(b.fechaVenc);});
-        for(var i=0;i<lotes.length&&rem>0;i++){
-          if(lotes[i].qty<=0) continue;
-          var take=Math.min(lotes[i].qty,rem);
-          lotes[i].qty-=take; rem-=take;
-          consumedLotes.push({loteId:lotes[i].id,fechaVenc:lotes[i].fechaVenc,qty:take});
+  const centerRef=_db.collection(DB_COL).doc(_centerKey(center));
+  _db.runTransaction(function(txn){
+    // Firestore exige TODAS las lecturas antes de cualquier escritura.
+    return Promise.all([txn.get(solRef),txn.get(centerRef)]).then(function(snaps){
+      if(!snaps[0].exists) throw Object.assign(new Error("pedido inexistente"),{code:"sol-gone"});
+      if(snaps[0].data().entregado===true) throw Object.assign(new Error("ya entregado"),{code:"ya-entregado"});
+      const raw=snaps[1].exists?snaps[1].data():{stock:{},lotes:{},movements:[]};
+      const migrated=raw.movementsMigrated===true;
+      const data=_txnBuildCenterData(raw,migrated);
+      movItems.forEach(function(base){
+        const mov=Object.assign({},base); // copia: la transacción puede reintentarse
+        const supplyId=mov.supplyId, qty=mov.qty;
+        data.stock[supplyId]=Math.max(0,(data.stock[supplyId]||0)-qty);
+        if(data.lotes&&data.lotes[supplyId]){
+          var rem=qty;
+          var lotes=data.lotes[supplyId];
+          var consumedLotes=[];
+          lotes.sort(function(a,b){return a.fechaVenc.localeCompare(b.fechaVenc);});
+          for(var i=0;i<lotes.length&&rem>0;i++){
+            if(lotes[i].qty<=0) continue;
+            var take=Math.min(lotes[i].qty,rem);
+            lotes[i].qty-=take; rem-=take;
+            consumedLotes.push({loteId:lotes[i].id,fechaVenc:lotes[i].fechaVenc,qty:take});
+          }
+          if(consumedLotes.length) mov.lotesConsumidos=consumedLotes;
+          var remaining=lotes.filter(function(l){return l.qty>0;});
+          if(remaining.length) data.lotes[supplyId]=remaining;
+          else delete data.lotes[supplyId];
         }
-        if(consumedLotes.length) mov.lotesConsumidos=consumedLotes;
-        var remaining=lotes.filter(function(l){return l.qty>0;});
-        if(remaining.length) data.lotes[supplyId]=remaining;
-        else delete data.lotes[supplyId];
-      }
-      _movPush(data,mov);
+        _movPush(data,mov);
+      });
+      _txnWriteCenterData(txn,centerRef,data,migrated);
+      txn.update(solRef,solUpdate);
+      return data;
     });
-    return data;
   }).then(function(data){
     cs[center].stock=data.stock;
     if(data.movements) cs[center].movements=data.movements;
@@ -7067,11 +7194,9 @@ function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
     const auditItems=(s.items||[]).filter(function(i){return i.id;}).map(function(i){return {id:i.id,name:i.name,qty:qtyMap?(qtyMap[i.id]??i.cantidad):i.cantidad};});
     _auditLog('solicitud_entregado',"Pedido entregado: "+(s.solicitante||'?')+" · "+(s.sector||'')+" · "+(s.fecha||''),null,{id,items:auditItems,center});
     toast("✓ Pedido entregado · Stock actualizado");
-    return updateSolicitud();
-  }).catch(function(e){
-    console.warn(e);
-    toast(_txnErrorMsg(e,"⚠️ Error al actualizar stock"));
-  });
+    closePdfViewer();
+  }).catch(onError)
+    .finally(function(){ _unlock(lockKey); });
 }
 // ─── Cantidades entregadas — dentro de pdf-viewer-overlay, sin getElementById ──
 let _eqSolId = null;
@@ -7463,14 +7588,28 @@ function backToEquipos(){
 }
 
 function makeEntregaId(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+// Almacenamiento de entregas (V6.5): antes TODAS las entregas de TODOS los
+// equipos vivían en un único documento "entregas" ({equipoId:[...]}), con el
+// PDF adjunto embebido en base64 (hasta 600KB cada uno). Firestore no admite
+// documentos de más de 1MB, así que con unos pocos PDFs acumulados ninguna
+// entrega nueva se iba a poder guardar más. Ahora cada entrega nueva es un
+// documento propio en entregas/items/{id} y su PDF otro en entregas/pdfs/{id}
+// (cada uno muy por debajo del límite). Las entregas viejas se siguen leyendo
+// del documento legado tal cual — no se migra ni se toca ningún dato existente.
+function _entregasItemsCol(){ return _db.collection(DB_COL).doc("entregas").collection("items"); }
+function _entregasPdfsCol(){ return _db.collection(DB_COL).doc("entregas").collection("pdfs"); }
 
 async function loadEntregasHistorial(equipoId){
   const el=document.getElementById("entregasHistorialList");
   el.innerHTML="<p style='color:var(--text3);font-size:.85rem'>Cargando historial…</p>";
   try{
-    const snap=await _db.collection(DB_COL).doc("entregas").get();
-    const raw=snap.exists?(snap.data()[equipoId]||[]):[];
-    _entregasHistorial=[...raw].sort((a,b)=>(b.creadoAt||"").localeCompare(a.creadoAt||""));
+    const [snap,itemsSnap]=await Promise.all([
+      _db.collection(DB_COL).doc("entregas").get(),
+      _entregasItemsCol().where("equipoId","==",equipoId).get()
+    ]);
+    const legacy=(snap.exists?(snap.data()[equipoId]||[]):[]).map(h=>({...h,_legacy:true}));
+    const nuevas=itemsSnap.docs.map(d=>d.data());
+    _entregasHistorial=[...legacy,...nuevas].sort((a,b)=>(b.creadoAt||"").localeCompare(a.creadoAt||""));
     renderEntregasHistorial();
   }catch(e){el.innerHTML="<p style='color:var(--red)'>Error: "+escHtml(e.message)+"</p>";}
 }
@@ -7489,7 +7628,7 @@ function renderEntregasHistorial(){
           <div class="entregas-hist-lic">👤 ${escHtml(h.licenciado||"—")}</div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
-          ${h.pdfBase64?`<button class="btn-pdf" onclick="openEntregaPdf('${escAttr(h.id)}','${escJs(h.pdfNombre||"documento.pdf")}')">PDF</button>`:""}
+          ${(h.pdfBase64||h.hasPdf)?`<button class="btn-pdf" onclick="openEntregaPdf('${escAttr(h.id)}','${escJs(h.pdfNombre||"documento.pdf")}')">PDF</button>`:""}
           <button class="btn-del-entrega" onclick="deleteEntrega('${escAttr(h.id)}')">&#128465;</button>
         </div>
       </div>
@@ -7539,21 +7678,27 @@ async function saveNuevaEntrega(){
   const btn=document.getElementById("saveEntregaBtn");
   btn.disabled=true; btn.textContent="Guardando…";
   try{
+    const eqId=entregasActiveEquipo.id;
     const data={
       id:makeEntregaId(),
+      equipoId:eqId,
       fecha,licenciado,obs,
       creadoAt:new Date().toISOString(),
       creadoPor:currentUser.email
     };
-    if(_nuevaEntregaPdfBase64){data.pdfBase64=_nuevaEntregaPdfBase64;data.pdfNombre=_nuevaEntregaPdfNombre;}
-    const eqId=entregasActiveEquipo.id;
-    await _db.collection(DB_COL).doc("entregas").set(
-      {[eqId]:firebase.firestore.FieldValue.arrayUnion(data)},{merge:true});
+    // Entrega y PDF en un mismo batch: se guardan los dos o ninguno.
+    const batch=_db.batch();
+    if(_nuevaEntregaPdfBase64){
+      data.hasPdf=true; data.pdfNombre=_nuevaEntregaPdfNombre;
+      batch.set(_entregasPdfsCol().doc(data.id),{pdfBase64:_nuevaEntregaPdfBase64,equipoId:eqId});
+    }
+    batch.set(_entregasItemsCol().doc(data.id),data);
+    await batch.commit();
     document.getElementById("nuevaEntregaModal").classList.remove("open");
     toast("✓ Entrega registrada");
     await loadEntregasHistorial(entregasActiveEquipo.id);
     updateHomeStatsEntregas();
-  }catch(e){toast("⚠️ Error: "+e.message);}
+  }catch(e){console.warn('[saveNuevaEntrega]',e);toast(_saveErrMsg(e));}
   finally{btn.disabled=false; btn.textContent="Guardar entrega";}
 }
 
@@ -7561,6 +7706,18 @@ async function deleteEntrega(entregaId){
   openConfirm("Eliminar entrega","¿Eliminar este registro de entrega?",async()=>{
     try{
       const eqId=entregasActiveEquipo.id;
+      const h=_entregasHistorial.find(x=>x.id===entregaId);
+      if(h&&!h._legacy){
+        // Entrega nueva (documento propio): se borran entrega y PDF juntos.
+        const b=_db.batch();
+        b.delete(_entregasItemsCol().doc(entregaId));
+        b.delete(_entregasPdfsCol().doc(entregaId));
+        await b.commit();
+        toast("✓ Entrega eliminada");
+        await loadEntregasHistorial(eqId);
+        updateHomeStatsEntregas();
+        return;
+      }
       const ref=_db.collection(DB_COL).doc("entregas");
       // Transacción (no .get()+.set() suelto): si dos personas borran
       // entregas distintas del mismo equipo casi al mismo tiempo, la
@@ -7573,13 +7730,21 @@ async function deleteEntrega(entregaId){
       });
       toast("✓ Entrega eliminada");
       await loadEntregasHistorial(eqId);
-    }catch(e){toast("⚠️ "+e.message);}
+      updateHomeStatsEntregas();
+    }catch(e){console.warn('[deleteEntrega]',e);toast(_saveErrMsg(e));}
   });
 }
 
 // PDF viewer
-function openEntregaPdf(entregaId, nombre){
+async function openEntregaPdf(entregaId, nombre){
   const h=_entregasHistorial.find(x=>x.id===entregaId);
+  if(h&&!h.pdfBase64&&h.hasPdf){
+    // Entregas nuevas: el PDF vive en su propio documento, se trae al abrirlo.
+    try{
+      const d=await _entregasPdfsCol().doc(entregaId).get();
+      if(d.exists) h.pdfBase64=d.data().pdfBase64;
+    }catch(e){ console.warn('[openEntregaPdf]',e); }
+  }
   if(!h||!h.pdfBase64){toast("⚠️ PDF no disponible");return;}
   const overlay=document.getElementById("pdf-viewer-overlay");
   document.getElementById("pdf-viewer-title").textContent=nombre||"Documento";
@@ -7605,9 +7770,12 @@ function closePdfViewer(){
 
 async function updateHomeStatsEntregas(){
   try{
-    const snap=await _db.collection(DB_COL).doc("entregas").get();
+    const [snap,itemsSnap]=await Promise.all([
+      _db.collection(DB_COL).doc("entregas").get(),
+      _entregasItemsCol().get()
+    ]);
     const data=snap.exists?snap.data():{};
-    let total=0;
+    let total=itemsSnap.size;
     Object.values(data).forEach(arr=>{if(Array.isArray(arr))total+=arr.length;});
     const el=document.getElementById("home-stats-entregas");
     if(el) el.innerHTML=`<span class="csp-pill csp-ok">${total} entrega${total!==1?"s":""} registrada${total!==1?"s":""}</span>`;
@@ -8133,22 +8301,47 @@ function updatePracQty(input){
   if(gtEl) gtEl.textContent=_pracFmt(grandTotal);
 
   clearTimeout(_pracMesSaveTimer);
-  _pracMesSaveTimer=setTimeout(function(){ savePracMes(true); }, 900);
+  _pracMesSaveTimer=setTimeout(function(){ _pracMesSaveTimer=null; savePracMes(true); }, 900);
 }
 
+// Guarda las cantidades de UN mes reemplazando ese mes completo. Antes era
+// .set({[mes]:data},{merge:true}), que en Firestore FUSIONA los mapas
+// anidados: una cantidad bajada a 0 (que se omite de `data`) nunca se borraba
+// del servidor y volvía a aparecer al reabrir. mergeFields reemplaza solo el
+// campo de ese mes, sin tocar los demás meses.
+function _savePracMesDoc(mes,data){
+  return _db.collection(DB_COL).doc("practicas_mes")
+    .set({[mes]:data},{mergeFields:[new firebase.firestore.FieldPath(mes)]});
+}
+// Si la app se cierra/oculta con un autoguardado todavía pendiente (debounce
+// de 900ms), se fuerza el guardado — antes lo tipeado en ese último segundo
+// se perdía.
+function _flushPracMesPending(){
+  if(_pracMesSaveTimer){ clearTimeout(_pracMesSaveTimer); _pracMesSaveTimer=null; savePracMes(true); }
+}
+document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="hidden") _flushPracMesPending(); });
+window.addEventListener("pagehide",_flushPracMesPending);
 function savePracMes(silent){
   if(!_pracCierreMes) return;
-  clearTimeout(_pracMesSaveTimer);
-  const data={};
-  document.querySelectorAll('.prac-mes-input').forEach(inp=>{
+  clearTimeout(_pracMesSaveTimer); _pracMesSaveTimer=null;
+  const inputs=document.querySelectorAll('.prac-mes-input');
+  // Sin la grilla del cierre en pantalla no hay nada que leer: guardar acá
+  // reemplazaría el mes con {} y BORRARÍA todas sus cantidades.
+  if(!inputs.length) return;
+  // Se parte de lo ya guardado del mes y solo se pisan los estudios que están
+  // en pantalla: así una cantidad de un estudio que después se quitó de la
+  // configuración (y ya no tiene campo) no se pierde al re-guardar el mes.
+  const data=Object.assign({},_pracMes[_pracCierreMes]||{});
+  inputs.forEach(inp=>{
     const k=inp.dataset.key;
     const q=parseInt(inp.value)||0;
-    if(k && q>0) data[k]=q;
+    if(!k) return;
+    if(q>0) data[k]=q; else delete data[k];
   });
   _pracMes[_pracCierreMes]=data; // mantener la fuente en memoria alineada con lo guardado
-  _db.collection(DB_COL).doc("practicas_mes").set({[_pracCierreMes]:data},{merge:true})
+  _savePracMesDoc(_pracCierreMes,data)
     .then(()=>{ if(!silent) toast('✓ Cierre mensual guardado'); })
-    .catch(()=>toast('⚠️ Error al guardar'));
+    .catch(e=>{ console.warn('[savePracMes]',e); toast(_saveErrMsg(e)); });
 }
 
 // ─── Exportar cierre mensual a PDF (tipología CIMA) ───────────────────────────
@@ -8165,7 +8358,7 @@ async function exportContablePDF(){
   // después se pierden porque nunca se guardaron en Firestore (solo quedaban
   // en memoria local hasta que alguien tocara "💾 Guardar mes").
   try{
-    await _db.collection(DB_COL).doc("practicas_mes").set({[_pracCierreMes]:_pracMes[_pracCierreMes]||{}},{merge:true});
+    await _savePracMesDoc(_pracCierreMes,_pracMes[_pracCierreMes]||{});
   }catch(e){
     console.warn('[Contable] Error guardando antes de exportar:',e);
     toast("⚠️ No se pudo guardar el cierre — el PDF puede no coincidir con lo guardado. Reintentá.");
@@ -8332,7 +8525,7 @@ async function exportContableExcel(){
     if(k){ if(!_pracMes[_pracCierreMes]) _pracMes[_pracCierreMes]={}; if(q>0) _pracMes[_pracCierreMes][k]=q; else delete _pracMes[_pracCierreMes][k]; }
   });
   try{
-    await _db.collection(DB_COL).doc("practicas_mes").set({[_pracCierreMes]:_pracMes[_pracCierreMes]||{}},{merge:true});
+    await _savePracMesDoc(_pracCierreMes,_pracMes[_pracCierreMes]||{});
   }catch(e){
     console.warn('[Contable] Error guardando antes de exportar:',e);
     toast("⚠️ No se pudo guardar el cierre — el Excel puede no coincidir con lo guardado. Reintentá.");

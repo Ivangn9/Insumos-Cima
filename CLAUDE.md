@@ -36,6 +36,20 @@ App de venta de comida, sin relación con CIMA. Convive en este repo pero es un 
 
 Las escrituras (`persist*`) están bloqueadas hasta que `_dataReady` sea `true`, y eso solo pasa con snapshots confirmados por el servidor (`_markLoaded` ignora `fromCache`). Como hay cache offline (`enablePersistence`), los listeners de `supplies`, `center_GN` y `center_Sarmiento` **deben** usar `onSnapshot({includeMetadataChanges:true}, …)`: sin eso, si el servidor confirma datos idénticos al cache, Firestore no emite el snapshot de confirmación y todas las escrituras quedan bloqueadas en silencio desde la segunda apertura de la app (bug real, corregido en V6.4). Cualquier listener nuevo que alimente `_markLoaded` necesita el mismo flag.
 
+### Reglas de guardado (V6.5 — auditoría completa de escrituras)
+
+No reintroducir estos patrones, cada uno causó o podía causar pérdida de datos real:
+
+- **Catálogo (`supplies`: insumos + proveedores)**: toda escritura pasa por `_txnSupplies(fn)` — transacción que lee el doc fresco del servidor, aplica `fn(data)` sobre esa copia y escribe. Nunca `.set({data:supplies,…})` desde la memoria (pisa cambios de otros dispositivos). `fn` no debe tener efectos fuera de `data` (la transacción se puede reintentar). Para ubicar un insumo usar `_txnSupply(d,id)` (aborta si ya no existe). `persist()`/`persistSupplies()` fueron eliminadas: `persist()` además reescribía el stock de ambos centros desde memoria al cambiar cualquier precio/proveedor.
+- **Stock**: siempre `_txnCenter` / `_txnTransfer`, y toda validación ("stock insuficiente") va DENTRO de la transacción, con el dato fresco.
+- **Avisar éxito solo después de la confirmación del servidor**, y no tocar la memoria local antes (o revertirla si falla). Mensajes de error vía `_saveErrMsg(e)`, que siempre dice "NO se guardó".
+- **Botones de guardar**: `_lock(key)` / `_unlock(key)` contra doble toque.
+- **Operaciones de varios pasos** (ej. entregar pedido = descontar stock + marcar entregado): una sola transacción que además verifique que no se aplicó antes (idempotencia), con IDs deterministas en vez de `Date.now()`.
+- **Arrays compartidos en un doc** (ej. `itemsPreparados`): `arrayUnion`/`arrayRemove`, nunca reescribir el array entero.
+- **Mapas anidados**: `set(…,{merge:true})` FUSIONA en profundidad (una clave borrada nunca se borra en el servidor). Para reemplazar un campo completo: `mergeFields:[new firebase.firestore.FieldPath(campo)]` (ver `_savePracMesDoc`).
+- **Tamaño**: 1MB por documento. Nada de crecer sin límite dentro de un único doc — las entregas nuevas van a `entregas/items/{id}` y su PDF a `entregas/pdfs/{id}`; el doc legado `entregas` se sigue leyendo (no migrado) para las viejas.
+- **`pedido-insumos.html`**: el ID del pedido se genera antes de enviar y se reutiliza en reintentos (nunca `.add()`), con timeout de 20s.
+
 ## Features — Comparador de presupuestos de proveedores
 
 Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.
