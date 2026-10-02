@@ -2491,7 +2491,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.2";
+const APP_VERSION = "6.3";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -2961,10 +2961,20 @@ function persistCenter(c){
   const key = c==="GN"?"center_GN":"center_Sarmiento";
   return _enqueue(()=>_db.collection(DB_COL).doc(key).set(_centerPayload(cs[c])).catch(e=>toast("⚠️ Error guardando")));
 }
-function persistSupplies(){
+// rethrow=true: propaga el error al llamador (await persistSupplies(true))
+// en vez de tragárselo acá — lo usa saveSupply() para poder revertir el
+// cambio en memoria y avisar con claridad si Firestore rechaza el guardado,
+// en vez de mostrar "✓ Guardado" y dejar el dato nuevo visible en pantalla
+// aunque el servidor nunca lo haya recibido (bug real: el insumo se veía
+// renombrado en Stock pero Pedido de Insumos seguía con el nombre viejo
+// porque ESE era, de hecho, el único guardado en Firestore).
+function persistSupplies(rethrow){
   if(!_dataReady){ console.warn('[Safety] persistSupplies() bloqueado — datos aún cargando'); _warnWriteBlocked(); return Promise.resolve(); }
   if(!supplies.length){ console.warn('[Safety] persistSupplies() bloqueado — supplies vacío'); return Promise.resolve(); }
-  return _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(e=>toast("⚠️ Error guardando")));
+  return _enqueue(()=>_db.collection(DB_COL).doc("supplies").set({data:supplies,suppliers}).catch(function(e){
+    if(rethrow) throw e;
+    toast("⚠️ Error guardando");
+  }));
 }
 
 let activeCenter=null, activeCat="Todos", chartDays=7, _charts={}, currentTab="inventario";
@@ -5281,62 +5291,86 @@ function saveSupply(){
   // "supplies", sin blast radius sobre el stock), y cualquier cambio de
   // stock pasa por _txnCenter (lectura fresca + escritura atómica), igual
   // que entrada/salida/traslado.
+  //
+  // NOTA (fix posterior): esta función mostraba "✓ Guardado" y cerraba el
+  // modal ANTES de confirmar que persistSupplies() hubiera guardado de
+  // verdad en Firestore (el error, si lo había, llegaba después en un toast
+  // aparte, fácil de no ver). Resultado real reportado: un insumo renombrado
+  // se veía bien en Stock de Insumos (el cambio quedaba en memoria) pero
+  // Pedido de Insumos seguía mostrando el nombre viejo — porque ESE era el
+  // único que de verdad estaba guardado en el servidor. Ahora se espera la
+  // confirmación real antes de avisar éxito, y si falla, se revierte el
+  // cambio en memoria (para que Stock tampoco mienta) y se avisa con
+  // claridad en vez de un toast que puede pasar desapercibido.
   if(_editId){
     const id=_editId;
     const s=supplies.find(x=>x.id===id);
-    const before=s?{name:s.name,code:s.code,price:s.price,category:s.category}:null;
-    if(s){ Object.assign(s,{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos}); }
-    _auditLog('supply_edit',`Insumo editado: "${name}"`,before,{name,code,price,category});
-    persistSupplies();
-    toast("✓ Insumo actualizado");
-    document.getElementById("addModal").classList.remove("open");
-    renderGestion();
-    if(currentTab==="inventario")renderInventario();
+    if(!s) return;
+    const before={name:s.name,code:s.code,price:s.price,category:s.category,unit:s.unit,minStock:s.minStock,presentacion:s.presentacion,unidadesPorCaja:s.unidadesPorCaja,pedidoFormatos:s.pedidoFormatos};
+    Object.assign(s,{name,code,category,unit,price,minStock,presentacion,unidadesPorCaja,pedidoFormatos});
+    persistSupplies(true).then(function(){
+      _auditLog('supply_edit',`Insumo editado: "${name}"`,before,{name,code,price,category});
+      toast("✓ Insumo actualizado");
+      document.getElementById("addModal").classList.remove("open");
+      renderGestion();
+      if(currentTab==="inventario")renderInventario();
 
-    const prevStock=cs[center].stock[id]||0;
-    if(initStk!==prevStock){
-      _txnCenter(center,function(data){
-        data.stock[id]=initStk;
-        return data;
-      }).then(function(data){
-        cs[center].stock=data.stock;
-        _auditLog('stock_adjust',`Ajuste manual de stock: "${name}" ${prevStock} → ${initStk} en ${center}`,{stock:prevStock},{stock:initStk});
-        updateCenterStats();
-        if(currentTab==="inventario")renderCurrentTab();
-      }).catch(function(e){
-        console.warn('Error ajustando stock:',e);
-        toast("⚠️ Los datos del insumo se guardaron, pero no se pudo ajustar el stock: "+(e.message||e));
-      });
-    }
+      const prevStock=cs[center].stock[id]||0;
+      if(initStk!==prevStock){
+        _txnCenter(center,function(data){
+          data.stock[id]=initStk;
+          return data;
+        }).then(function(data){
+          cs[center].stock=data.stock;
+          _auditLog('stock_adjust',`Ajuste manual de stock: "${name}" ${prevStock} → ${initStk} en ${center}`,{stock:prevStock},{stock:initStk});
+          updateCenterStats();
+          if(currentTab==="inventario")renderCurrentTab();
+        }).catch(function(e){
+          console.warn('Error ajustando stock:',e);
+          toast("⚠️ Los datos del insumo se guardaron, pero no se pudo ajustar el stock: "+(e.message||e));
+        });
+      }
+    }).catch(function(e){
+      Object.assign(s,before);
+      console.warn('[saveSupply] Error al guardar:',e);
+      toast('⚠️ No se pudo guardar el insumo — el cambio NO se aplicó: '+(e.message||e));
+    });
     return;
   }
 
   const id="cus_"+Date.now();
-  supplies.push({id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos});
-  _auditLog('supply_add',`Insumo creado: "${name}" (${code||'sin código'}) — precio: $${price}`);
-  persistSupplies();
-  toast("✓ Insumo agregado");
-  document.getElementById("addModal").classList.remove("open");
-  renderGestion();
-  if(currentTab==="inventario")renderInventario();
+  const newSupply={id,name,code:code||"USR-"+supplies.length,category,unit,price,minStock,active:true,presentacion,unidadesPorCaja,pedidoFormatos};
+  supplies.push(newSupply);
+  persistSupplies(true).then(function(){
+    _auditLog('supply_add',`Insumo creado: "${name}" (${code||'sin código'}) — precio: $${price}`);
+    toast("✓ Insumo agregado");
+    document.getElementById("addModal").classList.remove("open");
+    renderGestion();
+    if(currentTab==="inventario")renderInventario();
 
-  CENTERS.forEach(function(c){
-    const qty=c===center?initStk:0;
-    _txnCenter(c,function(data){
-      data.stock[id]=qty;
-      if(qty>0){
-        _movPush(data,{id:"mov_init_"+id+"_"+c,supplyId:id,supplyName:name,type:"entrada",qty,
-          date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),note:"Stock inicial"});
-      }
-      return data;
-    }).then(function(data){
-      cs[c].stock=data.stock;
-      if(data.movements) cs[c].movements=data.movements;
-      if(c===center){ updateCenterStats(); if(currentTab==="inventario")renderCurrentTab(); }
-    }).catch(function(e){
+    CENTERS.forEach(function(c){
+      const qty=c===center?initStk:0;
+      _txnCenter(c,function(data){
+        data.stock[id]=qty;
+        if(qty>0){
+          _movPush(data,{id:"mov_init_"+id+"_"+c,supplyId:id,supplyName:name,type:"entrada",qty,
+            date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),note:"Stock inicial"});
+        }
+        return data;
+      }).then(function(data){
+        cs[c].stock=data.stock;
+        if(data.movements) cs[c].movements=data.movements;
+        if(c===center){ updateCenterStats(); if(currentTab==="inventario")renderCurrentTab(); }
+      }).catch(function(e){
       console.warn('Error inicializando stock del nuevo insumo en',c,e);
       toast("⚠️ El insumo se creó, pero no se pudo inicializar el stock en "+c+": "+(e.message||e));
     });
+    });
+  }).catch(function(e){
+    const idx=supplies.indexOf(newSupply);
+    if(idx>=0) supplies.splice(idx,1);
+    console.warn('[saveSupply] Error al crear:',e);
+    toast('⚠️ No se pudo guardar el insumo nuevo — no se creó: '+(e.message||e));
   });
 }
 
