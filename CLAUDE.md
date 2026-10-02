@@ -32,6 +32,10 @@ App de venta de comida, sin relación con CIMA. Convive en este repo pero es un 
 - Formato `MAJOR.MINOR` (sin PATCH). Bump manual (no hay script tipo `tools/bump.js` acá todavía): patch/fix menores no requieren bump; una feature nueva sube MINOR (ej. `6.0`→`6.1`); un cambio estructural grande sube MAJOR y resetea MINOR a 0.
 - No hay changelog embebido (a diferencia de MedTrack) — no hace falta tocar nada más allá de las dos constantes.
 
+## Guardado y cache offline — `stock-insumos.html`
+
+Las escrituras (`persist*`) están bloqueadas hasta que `_dataReady` sea `true`, y eso solo pasa con snapshots confirmados por el servidor (`_markLoaded` ignora `fromCache`). Como hay cache offline (`enablePersistence`), los listeners de `supplies`, `center_GN` y `center_Sarmiento` **deben** usar `onSnapshot({includeMetadataChanges:true}, …)`: sin eso, si el servidor confirma datos idénticos al cache, Firestore no emite el snapshot de confirmación y todas las escrituras quedan bloqueadas en silencio desde la segunda apertura de la app (bug real, corregido en V6.4). Cualquier listener nuevo que alimente `_markLoaded` necesita el mismo flag.
+
 ## Features — Comparador de presupuestos de proveedores
 
 Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.
