@@ -1205,6 +1205,18 @@
     .rep-check-info { flex:1;min-width:0; }
     .rep-check-title { font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:2px; }
     .rep-check-sub { font-size:.75rem;color:var(--text3); }
+    /* Selector de insumos del reporte */
+    .rep-sup-panel { margin-top:12px;padding:12px;border-radius:var(--r-md);background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.28); }
+    .rep-sup-tools { display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0; }
+    .rep-sup-count { margin-left:auto;font-size:.8rem;font-weight:700;color:var(--accent); }
+    .rep-sup-list { max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:10px; }
+    .rep-sup-cat { position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(232,238,248,.97);font-size:.75rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;cursor:pointer; }
+    .rep-sup-cat span.n { margin-left:auto;font-weight:600;color:var(--text3);text-transform:none;letter-spacing:0; }
+    .rep-sup-item { display:flex;align-items:center;gap:10px;padding:9px 10px 9px 30px;font-size:.86rem;color:var(--text);cursor:pointer;border-bottom:1px solid rgba(120,120,128,.12); }
+    .rep-sup-item:hover { background:rgba(0,113,227,.06); }
+    .rep-sup-item .code { margin-left:auto;font-size:.72rem;color:var(--text3); }
+    .rep-sup-panel input[type=checkbox] { width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;cursor:pointer; }
+    .rep-sup-empty { padding:18px;text-align:center;font-size:.85rem;color:var(--text3); }
     .rep-toggle { width:44px;height:26px;appearance:none;-webkit-appearance:none;background:rgba(120,120,128,.22);border-radius:13px;cursor:pointer;transition:background .2s;flex-shrink:0;position:relative; }
     .rep-toggle::after { content:'';position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s,box-shadow .2s;box-shadow:0 1px 4px rgba(0,0,0,.25); }
     .rep-toggle:checked { background:var(--accent); }
@@ -1814,6 +1826,25 @@
         <div class="date-filter-group"><label>Desde</label><input type="date" id="repDateFrom" /></div>
         <div class="date-filter-group"><label>Hasta</label><input type="date" id="repDateTo" /></div>
         <button class="btn btn-secondary" style="flex-shrink:0" onclick="repVerTodo()" title="Incluir todo el historial en el reporte">🗓️ Todo el período</button>
+      </div>
+      <div class="rep-section-label" style="margin-bottom:10px">Insumos</div>
+      <div style="margin-bottom:20px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="rep-sup-btns">
+          <button class="rep-pill active" data-mode="todos" onclick="setRepSupMode('todos')">Todos</button>
+          <button class="rep-pill" data-mode="elegir" onclick="setRepSupMode('elegir')">Elegir insumos</button>
+        </div>
+        <div class="rep-sup-panel" id="rep-sup-panel" style="display:none">
+          <div class="search-wrap" style="margin-bottom:0">
+            <span class="search-icon">🔍</span>
+            <input type="search" class="search-input" id="repSupSearch" placeholder="Buscar insumo, código o categoría…" oninput="renderRepSupList()" autocomplete="off" />
+          </div>
+          <div class="rep-sup-tools">
+            <button class="btn btn-secondary" style="padding:6px 12px;font-size:.8rem" onclick="_repSupMarkVisible(true)" id="repSupMarkBtn">☑ Marcar todos</button>
+            <button class="btn btn-secondary" style="padding:6px 12px;font-size:.8rem" onclick="_repSupClear()">☐ Desmarcar todos</button>
+            <span class="rep-sup-count" id="repSupCount">0 seleccionados</span>
+          </div>
+          <div class="rep-sup-list" id="rep-sup-list"></div>
+        </div>
       </div>
       <div class="rep-section-label" style="margin-bottom:10px">Incluir en el reporte</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">
@@ -2491,7 +2522,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.5";
+const APP_VERSION = "6.6";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -6153,7 +6184,78 @@ function setRepCenter(c){
   document.querySelectorAll("#rep-center-btns .rep-pill").forEach(b=>b.classList.toggle("active",b.dataset.center===c));
 }
 
+// Selector de insumos del reporte: "Todos" (como siempre) o una selección
+// hecha a mano para ESE reporte. A propósito no se guarda en ningún lado:
+// vive solo en memoria mientras la app está abierta y arranca en "Todos".
+let _repSupMode="todos";
+const _repSupSel=new Set();
+function setRepSupMode(mode){
+  _repSupMode=mode;
+  document.querySelectorAll("#rep-sup-btns .rep-pill").forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+  const panel=document.getElementById("rep-sup-panel");
+  if(panel) panel.style.display=mode==="elegir"?"block":"none";
+  if(mode==="elegir") renderRepSupList();
+}
+// Insumos activos que coinciden con la búsqueda, ordenados por categoría y nombre
+function _repSupVisible(){
+  const q=_impNorm(document.getElementById("repSupSearch")?.value||"");
+  return supplies.filter(s=>s.active)
+    .filter(s=>!q||_impNorm([s.name,s.code,s.category].join(" ")).includes(q))
+    .sort((a,b)=>String(a.category||"").localeCompare(String(b.category||""),"es")||String(a.name||"").localeCompare(String(b.name||""),"es"));
+}
+function _repSupUpdateCount(){
+  // Si un insumo seleccionado se archivó mientras tanto, deja de contar
+  const activos=new Set(supplies.filter(s=>s.active).map(s=>s.id));
+  [..._repSupSel].forEach(id=>{ if(!activos.has(id)) _repSupSel.delete(id); });
+  const n=_repSupSel.size;
+  const el=document.getElementById("repSupCount");
+  if(el) el.textContent=n+" seleccionado"+(n!==1?"s":"");
+  const q=(document.getElementById("repSupSearch")?.value||"").trim();
+  const mb=document.getElementById("repSupMarkBtn");
+  if(mb) mb.textContent=q?"☑ Marcar los encontrados":"☑ Marcar todos";
+}
+function renderRepSupList(){
+  const el=document.getElementById("rep-sup-list"); if(!el) return;
+  const vis=_repSupVisible();
+  if(!vis.length){
+    el.innerHTML=`<div class="rep-sup-empty">No hay insumos que coincidan con la búsqueda.</div>`;
+    _repSupUpdateCount(); return;
+  }
+  const groups=new Map();
+  vis.forEach(s=>{ const c=s.category||"Sin categoría"; if(!groups.has(c)) groups.set(c,[]); groups.get(c).push(s); });
+  let html="";
+  groups.forEach((items,cat)=>{
+    const sel=items.filter(s=>_repSupSel.has(s.id)).length;
+    html+=`<label class="rep-sup-cat"><input type="checkbox" data-cat="${escAttr(cat)}" ${sel===items.length?"checked":""} onchange="_repSupToggleCat(this.dataset.cat,this.checked)">${escHtml(cat)}<span class="n">${sel}/${items.length}</span></label>`;
+    items.forEach(s=>{
+      html+=`<label class="rep-sup-item"><input type="checkbox" data-id="${escAttr(s.id)}" ${_repSupSel.has(s.id)?"checked":""} onchange="_repSupToggle(this.dataset.id,this.checked)"><span>${escHtml(s.name||"")}</span><span class="code">${escHtml(s.code||"")}</span></label>`;
+    });
+  });
+  el.innerHTML=html;
+  // Categoría parcialmente seleccionada: casilla "a medias"
+  el.querySelectorAll("input[data-cat]").forEach(cb=>{
+    const items=groups.get(cb.dataset.cat)||[];
+    const sel=items.filter(s=>_repSupSel.has(s.id)).length;
+    cb.indeterminate=sel>0&&sel<items.length;
+  });
+  _repSupUpdateCount();
+}
+function _repSupToggle(id,on){
+  if(on) _repSupSel.add(id); else _repSupSel.delete(id);
+  renderRepSupList();
+}
+function _repSupToggleCat(cat,on){
+  _repSupVisible().filter(s=>(s.category||"Sin categoría")===cat).forEach(s=>{ if(on) _repSupSel.add(s.id); else _repSupSel.delete(s.id); });
+  renderRepSupList();
+}
+function _repSupMarkVisible(on){
+  _repSupVisible().forEach(s=>{ if(on) _repSupSel.add(s.id); else _repSupSel.delete(s.id); });
+  renderRepSupList();
+}
+function _repSupClear(){ _repSupSel.clear(); renderRepSupList(); }
+
 function renderReportes(){
+  if(_repSupMode==="elegir") renderRepSupList();
   const today=new Date().toISOString().slice(0,10);
   const monthAgo=new Date(Date.now()-30*24*3600000).toISOString().slice(0,10);
   const df=document.getElementById("repDateFrom");
@@ -6177,6 +6279,11 @@ async function generateReport(){
   const incGastos=document.getElementById("repIncGastos")?.checked;
   const incPrecios=document.getElementById("repIncPrecios")?.checked;
   if(!incConsumos&&!incGastos&&!incPrecios){toast("⚠️ Seleccioná al menos una sección");return;}
+  // Insumos a incluir: todos los activos, o solo los elegidos a mano
+  const repElegidos=_repSupMode==="elegir";
+  if(repElegidos) _repSupUpdateCount();
+  if(repElegidos&&!_repSupSel.size){toast("⚠️ Elegí al menos un insumo, o volvé a \"Todos\"");return;}
+  const repSupplies=supplies.filter(s=>s.active&&(!repElegidos||_repSupSel.has(s.id)));
   if(!window.jspdf){toast("⚠️ Librería PDF no cargada, intentá de nuevo");return;}
 
   btn.disabled=true; btn.innerHTML='<span class="btn-icon">⏳</span> Generando...';
@@ -6265,10 +6372,11 @@ async function generateReport(){
     doc.setFillColor(...C.bgLight);
     doc.setDrawColor(...C.border);doc.setLineWidth(0.3);
     doc.roundedRect(mg,y,pageW-mg*2,metaBoxH,2,2,"FD");
-    const colW=(pageW-mg*2)/3;
+    const colW=(pageW-mg*2)/4;
     const metaItems=[
       {label:"SUCURSAL",val:centerLabel},
       {label:"PERÍODO",val:dateLabel},
+      {label:"INSUMOS",val:repElegidos?(repSupplies.length+" seleccionado"+(repSupplies.length!==1?"s":"")):"Todos"},
       {label:"GENERADO",val:new Date().toLocaleString("es-AR")},
     ];
     metaItems.forEach((item,i)=>{
@@ -6283,6 +6391,16 @@ async function generateReport(){
       }
     });
     y+=metaBoxH+10;
+    // Con selección manual, dejar escrito en el PDF qué insumos incluye
+    if(repElegidos){
+      const nombres=repSupplies.map(s=>s.name);
+      const MAX=12;
+      const txt="Insumos incluidos: "+nombres.slice(0,MAX).join(" · ")+(nombres.length>MAX?` · y ${nombres.length-MAX} más`:"");
+      doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...C.gray2);
+      const lines=doc.splitTextToSize(txt,pageW-mg*2);
+      doc.text(lines,mg,y-3);
+      y+=lines.length*3.4+4;
+    }
 
     // ── HELPERS ───────────────────────────────────────────────────
     function sepLine(){
@@ -6336,10 +6454,12 @@ async function generateReport(){
         if(centers.length>1)subHeader(center==="GN"?"GN · Guardias Nacionales":"Pedernera-Sarmiento · Sarmiento 1212");
         const movs=getMovs(center);
         const stk=cs[center]?.stock||{};
-        const rows=supplies.filter(s=>s.active).map(s=>{
+        const rows=repSupplies.map(s=>{
           const ent=movs.filter(m=>m.supplyId===s.id&&m.type==="entrada").reduce((a,m)=>a+m.qty,0);
           const sal=movs.filter(m=>m.supplyId===s.id&&m.type==="salida").reduce((a,m)=>a+m.qty,0);
-          if(!ent&&!sal)return null;
+          // Con "Todos" se omiten los insumos sin movimiento; si se eligieron a
+          // mano, se muestran igual (al menos con su stock actual).
+          if(!ent&&!sal&&!repElegidos)return null;
           return[s.name,s.code,s.category,ent?"+"+ent+" "+s.unit:"—",sal?sal+" "+s.unit:"—",(stk[s.id]||0)+" "+s.unit];
         }).filter(Boolean);
         pageCheck(30);
@@ -6367,7 +6487,7 @@ async function generateReport(){
         if(centers.length>1)subHeader(center==="GN"?"GN · Guardias Nacionales":"Pedernera-Sarmiento · Sarmiento 1212");
         const movs=getMovs(center);
         let totalGasto=0;
-        const rows=supplies.filter(s=>s.active).map(s=>{
+        const rows=repSupplies.map(s=>{
           const sal=movs.filter(m=>m.supplyId===s.id&&m.type==="salida"&&!m.traslado).reduce((a,m)=>a+m.qty,0);
           if(!sal)return null;
           const precio=s.price||0;const gasto=sal*precio;totalGasto+=gasto;
@@ -6402,7 +6522,7 @@ async function generateReport(){
     // ── EVOLUCIÓN DE PRECIOS ──────────────────────────────────────
     if(incPrecios){
       pageCheck(30);sepLine();sectionHeader("Evolución de Precios");
-      const activeSupplies=supplies.filter(s=>s.active&&(s.price>0||(s.priceHistory&&s.priceHistory.length)));
+      const activeSupplies=repSupplies.filter(s=>s.price>0||(s.priceHistory&&s.priceHistory.length));
       const rows=activeSupplies.map(s=>{
         const hist=s.priceHistory||[];
         const current=s.price||0;
@@ -6456,7 +6576,7 @@ async function generateReport(){
     if(progFill)progFill.style.width="95%";
 
     // ── Export ────────────────────────────────────────────────────
-    const filename="reporte-cima-"+new Date().toISOString().slice(0,10)+".pdf";
+    const filename="reporte-cima-"+new Date().toISOString().slice(0,10)+(repElegidos?"-seleccion":"")+".pdf";
     const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
     if(isIOS){
       doc.output("dataurlnewwindow",{filename});
