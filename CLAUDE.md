@@ -50,6 +50,14 @@ No reintroducir estos patrones, cada uno causó o podía causar pérdida de dato
 - **Tamaño**: 1MB por documento. Nada de crecer sin límite dentro de un único doc — las entregas nuevas van a `entregas/items/{id}` y su PDF a `entregas/pdfs/{id}`; el doc legado `entregas` se sigue leyendo (no migrado) para las viejas.
 - **`pedido-insumos.html`**: el ID del pedido se genera antes de enviar y se reutiliza en reintentos (nunca `.add()`), con timeout de 20s.
 
+## Lotes: número de lote + vencimiento (V6.7)
+
+- Cada lote (`cs[centro].lotes[supplyId][]`) puede tener `numeroLote` (opcional, texto del fabricante). Un lote se identifica por **vencimiento + número**: misma fecha con distinto número = lotes separados. Comparar SIEMPRE con `_loteKey()` (ignora mayúsculas y espacios), limpiar la entrada con `_cleanLote()`, mostrar con `_loteLabel()`.
+- No se puede cargar número sin fecha de vencimiento (sin fecha no se crea lote).
+- Trazabilidad: `lotesConsumidos[]` de salidas, traslados y entregas de pedidos guarda `numeroLote`; las entradas guardan `mov.numeroLote`. Un traslado lleva el número al lote creado en destino. Cualquier código nuevo que consuma o cree lotes tiene que propagar `numeroLote` igual.
+- IDs de lote: `_newLoteId()` (nunca `"lot_"+Date.now()` solo, que duplicaba IDs cuando un traslado creaba varios lotes en el mismo milisegundo).
+- Inventario tiene dos vistas (`_invView`, solo en memoria): "Por insumo" (etiquetas de lotes debajo de cada fila) y "Por lote y vencimiento" (`_renderInvLotes`: una fila por lote ordenada por vencimiento + bloque "Sin lote registrado" con el stock no asignado a lotes). Los buscadores de Inventario, Vencimientos y de la ficha del insumo (pestaña Lotes) encuentran por número de lote.
+
 ## Features — Comparador de presupuestos de proveedores
 
 Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.

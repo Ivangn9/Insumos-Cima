@@ -406,6 +406,27 @@
     .qty-btn.minus { background: rgba(255,59,48,.10); color: var(--red); border: 1px solid rgba(255,59,48,.20); }
     .qty-btn.plus  { background: rgba(52,199,89,.12);  color: #1a8f3c; border: 1px solid rgba(52,199,89,.24); }
 
+    /* ─── Inventario: vista por insumo / por lote ─────── */
+    .inv-view-toggle { display:inline-flex; gap:4px; padding:3px; margin-bottom:12px; border-radius:var(--r-pill); background:rgba(0,0,0,.06); }
+    .inv-view-btn { padding:6px 14px; border:none; border-radius:var(--r-pill); background:transparent; color:var(--text2); font-size:.82rem; font-weight:650; font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s,color .15s; }
+    .inv-view-btn.active { background:#fff; color:var(--accent); box-shadow:0 1px 4px rgba(0,0,0,.12); }
+    /* Las etiquetas de lote van en una línea propia, a todo el ancho de la fila
+       (dentro de la columna del nombre no entraban en pantallas angostas) */
+    .stock-row.has-lots { flex-wrap:wrap; row-gap:6px; }
+    .lot-chips { display:flex; flex-wrap:wrap; gap:5px; flex-basis:100%; }
+    .lot-row .stock-name { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .lot-chip { font-size:.66rem; font-weight:650; padding:1px 7px; border-radius:10px; border:1px solid; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+    .lot-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,.28); border-left:4px solid transparent; cursor:pointer; transition:background .15s; position:relative; z-index:1; }
+    .lot-row:last-child { border-bottom:none; }
+    .lot-row:hover { background:rgba(255,255,255,.22); }
+    .lot-main { flex:1; min-width:0; }
+    .lot-num { font-size:12px; font-weight:700; color:var(--text); }
+    .lot-num.none { font-weight:500; color:var(--text3); }
+    .lot-venc { text-align:right; flex-shrink:0; min-width:92px; }
+    .lot-venc .d { font-size:12px; font-weight:700; color:var(--text); }
+    .lot-venc .r { font-size:10.5px; font-weight:650; margin-top:1px; }
+    @media (max-width:520px){ .lot-venc{min-width:78px} .lot-row{padding:10px 12px;gap:8px} }
+
     /* ─── Movement log ───────────────────────────────── */
     .mov-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     .date-filter-group { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 170px; }
@@ -1580,7 +1601,11 @@
       <div class="stat-card"><div class="stat-icon orange">⚠️</div><div class="stat-info"><div class="stat-num" id="stat-low">0</div><div class="stat-lbl">Stock bajo</div></div></div>
       <div class="stat-card"><div class="stat-icon purple">💰</div><div class="stat-info"><div class="stat-num" id="stat-valor">$0</div><div class="stat-lbl">Valor en stock</div></div></div>
     </div>
-    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="search" id="invSearch" placeholder="Buscar insumo…" oninput="_debSearch(renderInventario)" autocomplete="off" /></div>
+    <div class="inv-view-toggle" id="invViewToggle" role="tablist">
+      <button class="inv-view-btn active" data-view="insumos" onclick="setInvView('insumos')">📦 Por insumo</button>
+      <button class="inv-view-btn" data-view="lotes" onclick="setInvView('lotes')">🏷️ Por lote y vencimiento</button>
+    </div>
+    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" type="search" id="invSearch" placeholder="Buscar insumo, código o n° de lote…" oninput="_debSearch(renderInventario)" autocomplete="off" /></div>
     <div class="hscroll-row">
       <button class="hscroll-arrow" onclick="_hscroll('invCatFilters',-1)" title="Ver categorías anteriores" aria-label="Anterior">‹</button>
       <div class="cat-filters" id="invCatFilters"></div>
@@ -1896,6 +1921,10 @@
         </select>
       </div>
     </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="search" class="search-input" id="vencSearch" placeholder="Buscar por número de lote, insumo o código…" oninput="renderVencimientos()" autocomplete="off" />
+    </div>
     <!-- Resumen chips -->
     <div id="vencSummary" style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap"></div>
     <!-- Lista de lotes -->
@@ -2059,6 +2088,10 @@
     </div>
     <div id="editLoteSupplyName" style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:14px"></div>
     <div class="form-group">
+      <label>🏷️ Número de lote <span style="font-size:.7rem;font-weight:400;color:var(--text3)">(opcional)</span></label>
+      <input type="text" id="editLoteNumero" class="modal-input" maxlength="40" placeholder="Ej: L23A0457" autocomplete="off" autocapitalize="characters" />
+    </div>
+    <div class="form-group">
       <label>Fecha de vencimiento</label>
       <input type="date" id="editLoteFechaVenc" class="modal-input" />
     </div>
@@ -2214,6 +2247,11 @@
           <span style="font-size:.7rem;font-weight:400;color:var(--text3)">(opcional)</span>
         </label>
         <input type="date" id="movFechaVenc" style="font-size:.9rem" />
+        <label for="movNumeroLote" style="display:flex;align-items:center;gap:6px;margin-top:10px">
+          🏷️ Número de lote
+          <span style="font-size:.7rem;font-weight:400;color:var(--text3)">(opcional · el que figura en la caja)</span>
+        </label>
+        <input type="text" id="movNumeroLote" maxlength="40" placeholder="Ej: L23A0457" autocomplete="off" autocapitalize="characters" style="font-size:.9rem" />
       </div>
       <div class="form-group"><label>Nota (opcional)</label><input type="text" id="movNote" placeholder="Ej: Pedido semanal…" /></div>
       <div class="form-group" id="movProveedorGroup"><label>Proveedor (solo entradas)</label><select id="movProveedor"><option value="">— Sin proveedor —</option></select></div>
@@ -2492,6 +2530,10 @@
     </div>
     <!-- Panel Lotes -->
     <div id="sdPanelLotes" style="display:none">
+      <div class="search-wrap" id="sdLotesSearchWrap" style="display:none">
+        <span class="search-icon">🔍</span>
+        <input type="search" class="search-input" id="sdLotesSearch" placeholder="Buscar por número de lote…" oninput="_renderSdLotes(_sdSupplyId)" autocomplete="off" />
+      </div>
       <div id="sdLotes" style="margin-bottom:12px"></div>
       <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="closeSupplyDetail();openMovModal(_sdSupplyId,'entrada')">📥 Registrar entrada con lote</button>
     </div>
@@ -2522,7 +2564,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.6";
+const APP_VERSION = "6.7";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -3083,6 +3125,91 @@ function _hscroll(id,dir){
   el.scrollBy({left:dir*160,behavior:'smooth'});
 }
 
+// Vista del Inventario: "insumos" (una fila por insumo, con sus lotes como
+// etiquetas) o "lotes" (una fila por lote, ordenadas por vencimiento). Solo
+// en memoria: al abrir la app arranca en "Por insumo".
+let _invView="insumos";
+function setInvView(v){
+  _invView=v;
+  document.querySelectorAll("#invViewToggle .inv-view-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
+  renderInventario();
+}
+// Colores por cercanía al vencimiento (mismos umbrales que Vencimientos)
+function _vencStyle(daysLeft){
+  if(daysLeft<0)   return {bg:"rgba(255,59,48,0.13)",color:"#d92b20",border:"rgba(255,59,48,0.25)",bar:"#ff3b30",txt:`Venció hace ${Math.abs(daysLeft)}d`};
+  if(daysLeft===0) return {bg:"rgba(255,59,48,0.13)",color:"#d92b20",border:"rgba(255,59,48,0.25)",bar:"#ff3b30",txt:"Vence HOY"};
+  if(daysLeft<=30) return {bg:"rgba(255,149,0,0.14)",color:"#b86e00",border:"rgba(255,149,0,0.25)",bar:"#ff9500",txt:`Vence en ${daysLeft}d`};
+  if(daysLeft<=90) return {bg:"rgba(255,214,0,0.16)",color:"#7a6000",border:"rgba(255,214,0,0.3)",bar:"#ffd60a",txt:`Vence en ${daysLeft}d`};
+  return {bg:"rgba(52,199,89,0.12)",color:"#1a8a38",border:"rgba(52,199,89,0.22)",bar:"#30d158",txt:`Vence en ${daysLeft}d`};
+}
+// ¿El insumo coincide con la búsqueda? (nombre, código o número de alguno de sus lotes)
+function _invMatch(s,q,lotes){
+  if(!q) return true;
+  if(s.name.toLowerCase().includes(q)||String(s.code||"").toLowerCase().includes(q)) return true;
+  const qk=_loteKey(q);
+  return !!qk&&(lotes||[]).some(l=>_loteKey(l.numeroLote).includes(qk));
+}
+// Vista "Por lote y vencimiento": una fila por lote de la sucursal activa,
+// ordenadas por vencimiento, + el stock que no tiene lote registrado.
+function _renderInvLotes(container,q){
+  const lotesCentro=cs[activeCenter]?.lotes||{};
+  const stk=curStock();
+  const qk=_loteKey(q);
+  const rows=[], sinLote=[];
+  supplies.filter(s=>s.active&&(activeCat==="Todos"||s.category===activeCat)).forEach(s=>{
+    const lotes=(lotesCentro[s.id]||[]).filter(l=>l.qty>0);
+    const nameHit=!q||s.name.toLowerCase().includes(q)||String(s.code||"").toLowerCase().includes(q);
+    lotes.forEach(l=>{
+      if(nameHit||(qk&&_loteKey(l.numeroLote).includes(qk))) rows.push({s,l,daysLeft:_daysLeft(l.fechaVenc)});
+    });
+    // Stock que no está asignado a ningún lote (entradas sin vencimiento, datos viejos)
+    const enLotes=lotes.reduce((a,l)=>a+l.qty,0);
+    const resto=(stk[s.id]||0)-enLotes;
+    if(resto>0&&nameHit) sinLote.push({s,qty:resto});
+  });
+  rows.sort((a,b)=>a.l.fechaVenc.localeCompare(b.l.fechaVenc)||a.s.name.localeCompare(b.s.name));
+  sinLote.sort((a,b)=>a.s.name.localeCompare(b.s.name));
+  if(!rows.length&&!sinLote.length){
+    container.innerHTML=q
+      ?`<div class="empty-state"><div class="es-icon">🔍</div><p>Ningún lote ni insumo coincide con "${escHtml(q)}"</p></div>`
+      :`<div class="empty-state gc"><div class="es-icon">🏷️</div><p>No hay stock disponible en esta sucursal${activeCat!=="Todos"?" para esta categoría":""}.</p></div>`;
+    return;
+  }
+  let html="";
+  if(rows.length){
+    html+=`<div class="stock-table gc" style="margin-bottom:14px"><div class="cat-header-row"><div class="cat-icon-badge" style="background:rgba(0,113,227,.12)">🏷️</div><span class="cat-name">Stock por lote</span><span class="cat-count">${rows.length} lote${rows.length!==1?"s":""}</span></div>`;
+    rows.forEach(({s,l,daysLeft})=>{
+      const st=_vencStyle(daysLeft);
+      html+=`<div class="lot-row" style="border-left-color:${st.bar}" onclick="openSupplyDetail('${escAttr(s.id)}','lotes')" title="Ver lotes de ${escAttr(s.name)}">
+        <div class="lot-main">
+          <div class="stock-name">${escHtml(s.name)}</div>
+          <div class="stock-meta">
+            ${l.numeroLote?`<span class="lot-num">🏷️ Lote ${escHtml(l.numeroLote)}</span>`:`<span class="lot-num none">Sin n° de lote</span>`}
+            <span class="stock-code">${escHtml(s.code||"")}</span>
+          </div>
+        </div>
+        <div class="lot-venc"><div class="d">📅 ${fmtDate(l.fechaVenc)}</div><div class="r" style="color:${st.color}">${st.txt}</div></div>
+        <span class="stock-level-badge slb-ok" style="background:${st.bg};color:${st.color}">${l.qty}</span>
+        <span class="stock-unit-label">${escHtml(s.unit||"")}</span>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  if(sinLote.length){
+    html+=`<div class="stock-table gc" style="margin-bottom:14px"><div class="cat-header-row"><div class="cat-icon-badge" style="background:rgba(0,0,0,.06)">📦</div><span class="cat-name">Sin lote registrado</span><span class="cat-count">${sinLote.length} insumo${sinLote.length!==1?"s":""}</span></div>
+      <div style="padding:0 16px 8px;font-size:.72rem;color:var(--text3)">Stock que entró sin fecha de vencimiento ni número de lote.</div>`;
+    sinLote.forEach(({s,qty})=>{
+      html+=`<div class="lot-row" onclick="openSupplyDetail('${escAttr(s.id)}')">
+        <div class="lot-main"><div class="stock-name">${escHtml(s.name)}</div><div class="stock-meta"><span class="stock-code">${escHtml(s.code||"")}</span></div></div>
+        <div class="lot-venc"><div class="d" style="color:var(--text3)">—</div></div>
+        <span class="stock-level-badge slb-empty">${qty}</span>
+        <span class="stock-unit-label">${escHtml(s.unit||"")}</span>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  container.innerHTML=html;
+}
 function renderInventario(){
   if(!activeCenter)return;
   buildCatFilters();
@@ -3094,7 +3221,7 @@ function renderInventario(){
   let totalItems=0,okItems=0,lowItems=0,totalValue=0;
   getCategories().forEach(cat=>{
     if(activeCat!=="Todos"&&activeCat!==cat)return;
-    const catSupplies=supplies.filter(s=>s.active&&s.category===cat&&(!q||s.name.toLowerCase().includes(q)||s.code.toLowerCase().includes(q)));
+    const catSupplies=supplies.filter(s=>s.active&&s.category===cat&&_invMatch(s,q,(cs[activeCenter]?.lotes||{})[s.id]));
     if(!catSupplies.length)return;
     const icon=CAT_SVG[cat]||CAT_ICONS[cat]||"📋",color=CAT_COLORS[cat]||"rgba(0,0,0,0.07)";
     const block=document.createElement("div");
@@ -3116,21 +3243,16 @@ function renderInventario(){
       totalValue+=cur*(s.price||0);
       const row=document.createElement("div");
       row.className="stock-row";
-      // Badge de vencimiento del lote más próximo
+      // Lotes del insumo como etiquetas: número + vencimiento + cantidad,
+      // coloreadas por cercanía al vencimiento (ya vienen ordenadas FEFO).
       const lotesInv=(cs[activeCenter]?.lotes||{})[s.id]?.filter(l=>l.qty>0)||[];
+      const MAX_CHIPS=4;
       let vencBadge="";
       if(lotesInv.length){
-        const soonest=lotesInv[0]; // ya están ordenados FEFO
-        const daysLeft=_daysLeft(soonest.fechaVenc);
-        if(daysLeft<0){
-          vencBadge=`<span style="font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(255,59,48,0.15);color:#d92b20;border:1px solid rgba(255,59,48,0.2)">VENCIDO ${fmtDate(soonest.fechaVenc)}</span>`;
-        } else if(daysLeft<=30){
-          vencBadge=`<span style="font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(255,149,0,0.15);color:#b86e00;border:1px solid rgba(255,149,0,0.2)">Vence ${fmtDate(soonest.fechaVenc)}</span>`;
-        } else if(daysLeft<=90){
-          vencBadge=`<span style="font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:10px;background:rgba(255,214,0,0.15);color:#7a6000;border:1px solid rgba(255,214,0,0.25)">Vence ${fmtDate(soonest.fechaVenc)}</span>`;
-        } else {
-          vencBadge=`<span style="font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:10px;background:rgba(52,199,89,0.12);color:#1a8a38;border:1px solid rgba(52,199,89,0.2)">Vence ${fmtDate(soonest.fechaVenc)}</span>`;
-        }
+        vencBadge=`<div class="lot-chips">`+lotesInv.slice(0,MAX_CHIPS).map(l=>{
+          const st=_vencStyle(_daysLeft(l.fechaVenc));
+          return `<span class="lot-chip" style="background:${st.bg};color:${st.color};border-color:${st.border}" title="${escAttr(_loteLabel(l)+" · "+st.txt+" · "+l.qty+" "+(s.unit||""))}">${l.numeroLote?"🏷️ "+escHtml(l.numeroLote)+" · ":""}${_daysLeft(l.fechaVenc)<0?"VENCIDO ":""}${fmtDate(l.fechaVenc)} · ${l.qty}</span>`;
+        }).join("")+(lotesInv.length>MAX_CHIPS?`<span class="lot-chip" style="background:rgba(0,0,0,.05);color:var(--text2);border-color:rgba(0,0,0,.08)">+${lotesInv.length-MAX_CHIPS} lotes</span>`:"")+`</div>`;
       }
       row.innerHTML=`
         <div class="stock-info">
@@ -3138,7 +3260,6 @@ function renderInventario(){
           <div class="stock-meta">
             <span class="stock-code">${escHtml(s.code)}</span>
             ${s.price>0?`<span class="stock-price-tag">$${fmt(s.price)}</span>`:""}
-            ${vencBadge}
           </div>
         </div>
         <div class="stock-controls">
@@ -3148,7 +3269,9 @@ function renderInventario(){
           <button class="qty-btn minus" onclick="event.stopPropagation();quickMov('${s.id}','salida')"  title="Salida">−</button>
           <button class="qty-btn plus"  onclick="event.stopPropagation();quickMov('${s.id}','entrada')" title="Entrada">+</button>
           <button style="width:26px;height:26px;border-radius:8px;border:none;background:rgba(0,113,227,0.1);color:var(--accent);cursor:pointer;font-size:.8rem;display:inline-flex;align-items:center;justify-content:center" onclick="event.stopPropagation();openSupplyDetail('${s.id}','lotes')" title="Ver lotes">📦</button>
-        </div>`;
+        </div>
+        ${vencBadge}`;
+      if(vencBadge) row.classList.add("has-lots");
       row.style.cursor="pointer";
       row.onclick=()=>openSupplyDetail(s.id);
       block.appendChild(row);
@@ -3156,6 +3279,9 @@ function renderInventario(){
     container.appendChild(block);
   });
   if(!container.children.length)container.innerHTML=`<div class="empty-state"><div class="es-icon">🔍</div><p>No se encontraron insumos</p></div>`;
+  // Vista por lote: los indicadores de arriba se calculan igual (por insumo),
+  // solo cambia la lista.
+  if(_invView==="lotes") _renderInvLotes(container,q);
   document.getElementById("stat-total").textContent=totalItems;
   document.getElementById("stat-ok").textContent=okItems;
   document.getElementById("stat-low").textContent=lowItems;
@@ -3217,8 +3343,10 @@ function renderMovimientos(){
     const gastoTag=m.type==="salida"&&s?.price&&!m.traslado?` · $${fmt(m.qty*s.price)}`:"";
     const trasladoTag=m.traslado?`<span class="mov-tag" title="${m.type==="salida"?"Trasladado a "+escAttr((BRAND_THEMES[m.trasladoDestino]&&BRAND_THEMES[m.trasladoDestino].nombre)||m.trasladoDestino||""):"Trasladado desde "+escAttr((BRAND_THEMES[m.trasladoOrigen]&&BRAND_THEMES[m.trasladoOrigen].nombre)||m.trasladoOrigen||"")}">🔀 Traslado</span>`:"";
     const loteTag=(m.lotesConsumidos&&m.lotesConsumidos.length)
-      ?`<span class="mov-tag" title="${escAttr(m.lotesConsumidos.map(function(c){return 'Vence '+fmtDate(c.fechaVenc)+': '+c.qty;}).join(' · '))}">📦 ${m.lotesConsumidos.length>1?m.lotesConsumidos.length+' lotes':'Vence '+fmtDate(m.lotesConsumidos[0].fechaVenc)}</span>`
-      :"";
+      ?`<span class="mov-tag" title="${escAttr(m.lotesConsumidos.map(function(c){return _loteLabel(c)+': '+c.qty;}).join(' · '))}">📦 ${m.lotesConsumidos.length>1?m.lotesConsumidos.length+' lotes':escHtml(_loteLabel(m.lotesConsumidos[0]))}</span>`
+      :(m.type==="entrada"&&m.numeroLote)
+        ?`<span class="mov-tag" title="${escAttr(_loteLabel(m))}">🏷️ Lote ${escHtml(m.numeroLote)}</span>`
+        :"";
     const userTag=m.user?`<span class="mov-tag" title="${escAttr(m.user)}">👤 ${escHtml(m.user.split('@')[0])}</span>`:"";
     return `<div class="mov-card gc">
       <div class="mov-type-icon ${m.type}">${icon}</div>
@@ -3264,7 +3392,7 @@ function deleteMov(id){
       // viejos sin este dato no revierten lote, igual que antes).
       if(m.type==="entrada" && m.fechaVenc && data.lotes[m.supplyId]){
         var arr=data.lotes[m.supplyId];
-        var l=arr.find(function(x){return x.fechaVenc===m.fechaVenc;});
+        var l=arr.find(function(x){return x.fechaVenc===m.fechaVenc&&_loteKey(x.numeroLote)===_loteKey(m.numeroLote);});
         if(l){ l.qty-=m.qty; }
         data.lotes[m.supplyId]=arr.filter(function(x){return x.qty>0;});
         if(!data.lotes[m.supplyId].length) delete data.lotes[m.supplyId];
@@ -4852,6 +4980,8 @@ function openMovModal(supplyId,type){
   if(upEl)upEl.value="";
   const fvEl=document.getElementById("movFechaVenc");
   if(fvEl)fvEl.value="";
+  const nlEl=document.getElementById("movNumeroLote");
+  if(nlEl)nlEl.value="";
   // Reset presentación
   const pt=document.getElementById("movPresTipo"); if(pt)pt.value="Unitario";
   const pu=document.getElementById("movPresUnits"); if(pu)pu.value="";
@@ -4912,7 +5042,7 @@ function onMovSupplyChange(){
       const icon=daysLeft<0?"🔴":daysLeft<=30?"🟠":daysLeft<=90?"🟡":"🟢";
       const label=daysLeft<0?"VENCIDO":daysLeft===0?"Vence HOY":`${daysLeft}d restantes`;
       const presTag=l.presentacion?` · ${l.presentacion.tipo} × ${l.presentacion.units}`:"";
-      return `<option value="${escAttr(l.id)}">${icon} Vence ${fmtDate(l.fechaVenc)} — ${l.qty} disp.${presTag} (${label})</option>`;
+      return `<option value="${escAttr(l.id)}">${icon} ${escHtml(_loteLabel(l))} — ${l.qty} disp.${presTag} (${label})</option>`;
     }).join("");
   lotesGroup.style.display="block";
   onLoteSelectChange();
@@ -4960,7 +5090,7 @@ function onLoteSelectChange(){
   if(!loteInfo||!supplyId)return;
   if(loteId==="fefo"){
     const lotes=(cs[activeCenter]?.lotes||{})[supplyId]?.filter(l=>l.qty>0)||[];
-    if(lotes.length){loteInfo.textContent=`FEFO: se consumirá del lote que vence ${fmtDate(lotes[0].fechaVenc)} (${lotes[0].qty} disp.)`;}
+    if(lotes.length){loteInfo.textContent=`FEFO: se consumirá del lote más próximo a vencer — ${_loteLabel(lotes[0])} (${lotes[0].qty} disp.)`;}
     return;
   }
   const lote=(cs[activeCenter]?.lotes||{})[supplyId]?.find(l=>l.id===loteId);
@@ -5056,10 +5186,24 @@ function _movDrop(data,movId){
   if(data.movements){ data.movements=data.movements.filter(function(m){return m.id!==movId;}); }
   else { data._movDelete=(data._movDelete||[]).concat([movId]); }
 }
-function _lotesEntrada(lotes,supplyId,qty,fechaVenc,presentacion,date){
+// Número de lote (el impreso por el fabricante): texto libre, sin espacios
+// sobrantes. Para COMPARAR se ignoran mayúsculas/minúsculas y espacios
+// ("l23 a0457" y "L23A0457" son el mismo lote).
+function _cleanLote(v){ return String(v||"").trim().replace(/\s+/g," ").slice(0,40); }
+function _loteKey(v){ return _cleanLote(v).toUpperCase().replace(/\s+/g,""); }
+// ID único de lote: antes era "lot_"+Date.now(), y un traslado que movía
+// varios lotes a la vez los creaba en el MISMO milisegundo con el mismo ID
+// (después, editar o consumir uno afectaba al otro).
+function _newLoteId(){ return "lot_"+Date.now()+"_"+Math.random().toString(36).slice(2,7); }
+// Texto corto para mostrar un lote: "Lote L23A0457 · Vence 12/05/2027"
+function _loteLabel(l){ return (l.numeroLote?"Lote "+l.numeroLote+" · ":"")+"Vence "+fmtDate(l.fechaVenc); }
+function _lotesEntrada(lotes,supplyId,qty,fechaVenc,presentacion,date,numeroLote){
   if(!lotes[supplyId])lotes[supplyId]=[];
+  numeroLote=_cleanLote(numeroLote);
   var existing=lotes[supplyId].find(function(l){
     if(l.fechaVenc!==fechaVenc)return false;
+    // Mismo vencimiento pero distinto número de lote = lotes distintos
+    if(_loteKey(l.numeroLote)!==_loteKey(numeroLote))return false;
     var lp=l.presentacion,np=presentacion;
     if(!lp&&!np)return true; if(!lp||!np)return false;
     return lp.tipo===np.tipo&&lp.units===np.units;
@@ -5068,12 +5212,13 @@ function _lotesEntrada(lotes,supplyId,qty,fechaVenc,presentacion,date){
     existing.qty+=qty;
     if(presentacion&&existing.presentacion)existing.presentacion.count+=presentacion.count;
   }else{
-    var lote={id:"lot_"+Date.now(),fechaVenc:fechaVenc,qty:qty,fechaEntrada:date};
+    var lote={id:_newLoteId(),fechaVenc:fechaVenc,qty:qty,fechaEntrada:date};
+    if(numeroLote)lote.numeroLote=numeroLote;
     if(presentacion)lote.presentacion=presentacion;
     lotes[supplyId].push(lote);
   }
   lotes[supplyId].sort(function(a,b){return a.fechaVenc.localeCompare(b.fechaVenc);});
-  return " · Vence "+fmtDate(fechaVenc)+(presentacion?" · "+presentacion.count+" "+presentacion.tipo.toLowerCase()+(presentacion.count!==1?"s":""):"");
+  return (numeroLote?" · Lote "+numeroLote:"")+" · Vence "+fmtDate(fechaVenc)+(presentacion?" · "+presentacion.count+" "+presentacion.tipo.toLowerCase()+(presentacion.count!==1?"s":""):"");
 }
 // Descuenta stock de lote(s) en una salida y devuelve, además del texto para
 // mostrar, la trazabilidad exacta: de qué lote(s) salió cada unidad
@@ -5089,8 +5234,8 @@ function _lotesSalida(lotes,supplyId,qty,loteId){
       if(lote){
         var take1=Math.min(qty,lote.qty);
         lote.qty=Math.max(0,lote.qty-qty);
-        consumed.push("Vence "+fmtDate(lote.fechaVenc));
-        consumedLotes.push({loteId:lote.id,fechaVenc:lote.fechaVenc,qty:take1});
+        consumed.push(_loteLabel(lote));
+        consumedLotes.push(Object.assign({loteId:lote.id,fechaVenc:lote.fechaVenc,qty:take1},lote.numeroLote?{numeroLote:lote.numeroLote}:{}));
       }
     }else{
       var toRemove=qty;
@@ -5098,14 +5243,14 @@ function _lotesSalida(lotes,supplyId,qty,loteId){
         if(toRemove<=0)break;
         var take=Math.min(toRemove,arr[i].qty);
         arr[i].qty-=take;toRemove-=take;
-        consumed.push(fmtDate(arr[i].fechaVenc)+":"+take);
-        consumedLotes.push({loteId:arr[i].id,fechaVenc:arr[i].fechaVenc,qty:take});
+        consumed.push(_loteLabel(arr[i])+": "+take);
+        consumedLotes.push(Object.assign({loteId:arr[i].id,fechaVenc:arr[i].fechaVenc,qty:take},arr[i].numeroLote?{numeroLote:arr[i].numeroLote}:{}));
       }
     }
     lotes[supplyId]=(lotes[supplyId]||[]).filter(function(l){return l.qty>0;});
     if(!lotes[supplyId].length)delete lotes[supplyId];
   }
-  return {detail:consumed.length?" · Lote "+consumed[0]:"", consumedLotes:consumedLotes};
+  return {detail:consumed.length?" · "+consumed[0]:"", consumedLotes:consumedLotes};
 }
 // Revierte una salida por lote (usado al eliminar un movimiento): suma la
 // cantidad de vuelta al lote correspondiente, y si el lote ya no existe
@@ -5116,7 +5261,7 @@ function _revertLotesSalida(lotes,supplyId,consumedLotes){
   consumedLotes.forEach(function(c){
     var l=arr.find(function(x){return x.id===c.loteId;});
     if(l){ l.qty+=c.qty; }
-    else{ arr.push({id:c.loteId,fechaVenc:c.fechaVenc,qty:c.qty}); }
+    else{ arr.push(Object.assign({id:c.loteId,fechaVenc:c.fechaVenc,qty:c.qty},c.numeroLote?{numeroLote:c.numeroLote}:{})); }
   });
   arr.sort(function(a,b){return a.fechaVenc.localeCompare(b.fechaVenc);});
 }
@@ -5133,7 +5278,10 @@ function saveMovimiento(){
   const proveedor=suppliers.find(x=>x.id===proveedorId);
   const unitPrice=parseFloat(document.getElementById("movUnitPrice")?.value)||0;
   const fechaVenc=document.getElementById("movFechaVenc")?.value||"";
+  const numeroLote=_movType==="entrada"?_cleanLote(document.getElementById("movNumeroLote")?.value):"";
   const loteSelectId=document.getElementById("movLoteSelect")?.value||"fefo";
+  // El lote se identifica por número + vencimiento: sin fecha no hay lote.
+  if(numeroLote&&!fechaVenc){toast("⚠️ Para registrar el número de lote, cargá también la fecha de vencimiento");return;}
 
   // El precio de la entrada se guarda recién DESPUÉS de que el movimiento se
   // confirma (más abajo) — antes se guardaba primero, así que si el
@@ -5160,6 +5308,7 @@ function saveMovimiento(){
     time:new Date().toTimeString().slice(0,5),note,
     ...(proveedorId&&{proveedorId,proveedorName:proveedor?.name||""}),
     ...(fechaVenc&&movType==="entrada"&&{fechaVenc}),
+    ...(numeroLote&&movType==="entrada"&&{numeroLote}),
     ...(presentacion&&{presentacion}),
     ...(currentUser?.email&&{user:currentUser.email})
   };
@@ -5169,7 +5318,7 @@ function saveMovimiento(){
   _txnCenter(center,function(data){
     delete mov.lotesConsumidos; salidaDetail=""; // la transacción puede reintentarse
     if(movType==="entrada"&&fechaVenc){
-      _lotesEntrada(data.lotes,supplyId,qty,fechaVenc,presentacion,date);
+      _lotesEntrada(data.lotes,supplyId,qty,fechaVenc,presentacion,date,numeroLote);
     } else if(movType==="salida"){
       const r=_lotesSalida(data.lotes,supplyId,qty,loteSelectId);
       salidaDetail=r.detail;
@@ -5190,7 +5339,7 @@ function saveMovimiento(){
     cs[center].stock=data.stock;
     if(data.movements) cs[center].movements=data.movements; // legacy: migrado lo maneja el listener de la subcolección
     cs[center].lotes=data.lotes;
-    const toastDetail=movType==="entrada"?(fechaVenc?" · Vence "+fmtDate(fechaVenc):""):salidaDetail;
+    const toastDetail=movType==="entrada"?((numeroLote?" · Lote "+numeroLote:"")+(fechaVenc?" · Vence "+fmtDate(fechaVenc):"")):salidaDetail;
     _auditLog("mov_"+movType,(movType==="entrada"?"Entrada":"Salida")+": "+qty+" "+(s.unit||"ud")+" de \""+s.name+"\" en "+center+toastDetail+(note?" · "+note:""),null,{stock:cs[center].stock[supplyId]});
     toast("✓ "+(movType==="entrada"?"Entrada":"Salida")+" registrada: "+qty+" "+s.unit+" de "+s.name+toastDetail);
     if(navigator.vibrate)navigator.vibrate([8,50,8]);
@@ -5260,7 +5409,7 @@ function onTrasladoSupplyChange(){
       const daysLeft=_daysLeft(l.fechaVenc);
       const icon=daysLeft<0?"🔴":daysLeft<=30?"🟠":daysLeft<=90?"🟡":"🟢";
       const label=daysLeft<0?"VENCIDO":daysLeft===0?"Vence HOY":`${daysLeft}d restantes`;
-      return `<option value="${escAttr(l.id)}">${icon} Vence ${fmtDate(l.fechaVenc)} — ${l.qty} disp. (${label})</option>`;
+      return `<option value="${escAttr(l.id)}">${icon} ${escHtml(_loteLabel(l))} — ${l.qty} disp. (${label})</option>`;
     }).join("");
   lotesGroup.style.display="block";
   onTrasladoLoteChange();
@@ -5273,7 +5422,7 @@ function onTrasladoLoteChange(){
   if(!loteInfo||!supplyId)return;
   if(loteId==="fefo"){
     const lotes=(cs[from]?.lotes||{})[supplyId]?.filter(l=>l.qty>0)||[];
-    if(lotes.length)loteInfo.textContent=`FEFO: se trasladará del lote que vence ${fmtDate(lotes[0].fechaVenc)} (${lotes[0].qty} disp.)`;
+    if(lotes.length)loteInfo.textContent=`FEFO: se trasladará del lote más próximo a vencer — ${_loteLabel(lotes[0])} (${lotes[0].qty} disp.)`;
     return;
   }
   const lote=(cs[from]?.lotes||{})[supplyId]?.find(l=>l.id===loteId);
@@ -5315,7 +5464,7 @@ function saveTraslado(){
     const r=_lotesSalida(fromData.lotes,supplyId,qty,loteSelectId);
     fromData.stock[supplyId]=(fromData.stock[supplyId]||0)-qty;
     if(r.consumedLotes.length){
-      r.consumedLotes.forEach(function(c){ _lotesEntrada(toData.lotes,supplyId,c.qty,c.fechaVenc,null,date); });
+      r.consumedLotes.forEach(function(c){ _lotesEntrada(toData.lotes,supplyId,c.qty,c.fechaVenc,null,date,c.numeroLote); });
     }
     toData.stock[supplyId]=(toData.stock[supplyId]||0)+qty;
     const movOut={id:movIdOut,supplyId,supplyName:s.name,type:"salida",qty,date,time,note,
@@ -6652,13 +6801,30 @@ function openSupplyDetail(supplyId,openTab){
   document.getElementById("sdStockBox").innerHTML=stockHtml;
 
   // ── Lotes tab: lotes de ambos centros ─────────────────────────────────────
+  const sq=document.getElementById("sdLotesSearch"); if(sq) sq.value="";
+  _renderSdLotes(supplyId);
+
+  document.getElementById("supplyDetailOverlay").classList.add("open");
+  switchSdTab(openTab||'resumen');
+}
+// Lista de lotes de un insumo (ambas sucursales) en su ficha, filtrable por
+// número de lote. Separada de openSupplyDetail para poder re-dibujarla al
+// escribir en el buscador sin rearmar toda la ficha.
+function _renderSdLotes(supplyId){
+  const s=supplies.find(x=>x.id===supplyId); if(!s)return;
+  const isCaja=s.presentacion==="caja"&&(s.unidadesPorCaja||1)>1;
+  const upc=s.unidadesPorCaja||1;
   const CENTS=[{key:"GN",label:"GN · Guard. Nac."},{key:"Sarmiento",label:"Sarmiento"}];
   const today=new Date();
   let lotesHtml="";
   let totalLotes=0;
   let firstCenter=true;
+  let totalSinBuscar=0;
+  const qLote=_loteKey(document.getElementById("sdLotesSearch")?.value||"");
   CENTS.forEach(function(c){
-    const lotes=(cs[c.key]?.lotes||{})[supplyId]?.filter(function(l){return l.qty>0;})||[];
+    const todos=(cs[c.key]?.lotes||{})[supplyId]?.filter(function(l){return l.qty>0;})||[];
+    totalSinBuscar+=todos.length;
+    const lotes=qLote?todos.filter(function(l){return _loteKey(l.numeroLote).includes(qLote);}):todos;
     if(!lotes.length)return;
     totalLotes+=lotes.length;
     lotesHtml+=`<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:${firstCenter?0:14}px 0 8px">${c.label}</div>`;
@@ -6683,7 +6849,8 @@ function openSupplyDetail(supplyId,openTab){
       return `<div style="padding:10px 14px;margin-bottom:8px;border-radius:var(--r-md);border:1px solid rgba(0,0,0,.08);border-left:4px solid ${borderC};background:var(--glass2)">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
           <div style="min-width:0">
-            <div style="font-size:.85rem;font-weight:700;color:var(--text)">📅 ${fmtDate(l.fechaVenc)}</div>
+            ${l.numeroLote?`<div style="font-size:.85rem;font-weight:800;color:var(--text)">🏷️ Lote ${escHtml(l.numeroLote)}</div>`:""}
+            <div style="font-size:${l.numeroLote?".78rem;font-weight:600;color:var(--text2)":".85rem;font-weight:700;color:var(--text)"}">📅 ${fmtDate(l.fechaVenc)}</div>
             <div style="font-size:.72rem;color:var(--text3);margin-top:2px">${icon} ${labelD}${l.fechaEntrada?` · Ingresado ${fmtDate(l.fechaEntrada)}`:""}</div>
             ${presLine}
           </div>
@@ -6697,18 +6864,23 @@ function openSupplyDetail(supplyId,openTab){
       </div>`;
     }).join("");
   });
-  if(!totalLotes){
+  if(!totalLotes&&qLote&&totalSinBuscar){
+    lotesHtml=`<div style="text-align:center;padding:24px 16px;color:var(--text3);font-size:.85rem">Ningún lote coincide con la búsqueda.</div>`;
+  } else if(!totalLotes){
     lotesHtml=`<div style="text-align:center;padding:28px 16px;color:var(--text3);font-size:.85rem">Sin lotes cargados.<br><span style="font-size:.75rem;opacity:.7">Registrá una entrada con fecha de vencimiento para verlos aquí.</span></div>`;
   }
   document.getElementById("sdLotes").innerHTML=lotesHtml;
 
+  // El buscador aparece solo si hay más de un lote para elegir
+  const sw=document.getElementById("sdLotesSearchWrap");
+  if(sw) sw.style.display=totalSinBuscar>1?"":"none";
+
   // Badge en tab Lotes
   const badge=document.getElementById('sdLotesBadge');
-  if(totalLotes>0){badge.textContent=totalLotes;badge.style.display="";}
+  // El badge cuenta TODOS los lotes del insumo, no solo los que coinciden con la búsqueda
+  if(totalSinBuscar>0){badge.textContent=totalSinBuscar;badge.style.display="";}
   else badge.style.display="none";
 
-  document.getElementById("supplyDetailOverlay").classList.add("open");
-  switchSdTab(openTab||'resumen');
 }
 function closeSupplyDetail(){document.getElementById("supplyDetailOverlay").classList.remove("open");}
 
@@ -6722,6 +6894,7 @@ function openEditLoteModal(center,supplyId,loteId){
   document.getElementById('editLoteSupplyName').textContent=supply?supply.name:'';
   document.getElementById('editLoteUnitLabel').textContent=supply?.unit||'UND';
   document.getElementById('editLoteFechaVenc').value=lote.fechaVenc||'';
+  document.getElementById('editLoteNumero').value=lote.numeroLote||'';
   document.getElementById('editLoteQty').value=lote.qty||'';
   document.getElementById('editLoteFechaEntrada').value=lote.fechaEntrada||'';
   document.getElementById('editLoteModal').classList.add('open');
@@ -6736,6 +6909,7 @@ function saveEditLote(){
   const fechaVenc=document.getElementById('editLoteFechaVenc').value;
   const qty=parseInt(document.getElementById('editLoteQty').value)||0;
   const fechaEntrada=document.getElementById('editLoteFechaEntrada').value;
+  const numeroLote=_cleanLote(document.getElementById('editLoteNumero').value);
   if(!fechaVenc){ toast('⚠️ Ingresá la fecha de vencimiento'); return; }
   if(qty<1){ toast('⚠️ La cantidad debe ser mayor a 0'); return; }
   if(!_dataReady){ toast('⚠️ Esperá a que carguen los datos'); return; }
@@ -6748,11 +6922,12 @@ function saveEditLote(){
     lote.fechaVenc=fechaVenc;
     lote.qty=qty;
     if(fechaEntrada) lote.fechaEntrada=fechaEntrada; else delete lote.fechaEntrada;
+    if(numeroLote) lote.numeroLote=numeroLote; else delete lote.numeroLote;
     data.lotes[supplyId].sort(function(a,b){return a.fechaVenc.localeCompare(b.fechaVenc);});
     return data;
   }).then(function(data){
     cs[center].lotes=data.lotes;
-    _auditLog('lote_edit','Lote editado: '+supplyName+' ('+center+')',null,{fechaVenc,qty,fechaEntrada});
+    _auditLog('lote_edit','Lote editado: '+supplyName+' ('+center+')'+(numeroLote?' · Lote '+numeroLote:''),null,{fechaVenc,qty,fechaEntrada,numeroLote:numeroLote||null});
     if(currentTab==='vencimientos') renderVencimientos();
     if(_sdSupplyId===supplyId) openSupplyDetail(supplyId);
     renderInventario();
@@ -6772,7 +6947,7 @@ function deleteEditLote(){
   const snapQty=lote.qty;
   openConfirm(
     'Eliminar lote',
-    '¿Eliminar el lote (vence '+fmtDate(snapFechaVenc)+', '+snapQty+' '+(supply?.unit||'UND')+')? Esta acción no se puede deshacer.',
+    '¿Eliminar el lote '+(lote.numeroLote?lote.numeroLote+' ':'')+'(vence '+fmtDate(snapFechaVenc)+', '+snapQty+' '+(supply?.unit||'UND')+')? Esta acción no se puede deshacer.',
     function(){
       if(!_dataReady){ toast('⚠️ Esperá a que carguen los datos'); return; }
       closeEditLoteModal();
@@ -6839,6 +7014,13 @@ function renderVencimientos(){
   const filterCenter=document.getElementById("vencCenterFilter")?.value||"ambos";
   let rows=getAllLotes();
   if(filterCenter!=="ambos")rows=rows.filter(r=>r.center===filterCenter);
+  const totalSinBuscar=rows.length;
+  // Buscador: número de lote (ignora mayúsculas y espacios), insumo o código
+  const qRaw=(document.getElementById("vencSearch")?.value||"").trim();
+  if(qRaw){
+    const qLote=_loteKey(qRaw), qTxt=_impNorm(qRaw);
+    rows=rows.filter(r=>(qLote&&_loteKey(r.numeroLote).includes(qLote))||_impNorm((r.supplyName||"")+" "+(r.supplyCode||"")).includes(qTxt));
+  }
 
   const expired=rows.filter(r=>r.daysLeft<0);
   const soon=rows.filter(r=>r.daysLeft>=0&&r.daysLeft<=30);
@@ -6855,6 +7037,14 @@ function renderVencimientos(){
     <span style="font-size:.75rem;font-weight:600;color:${c.color}">${c.label}</span>
   </div>`).join("");
 
+  if(!rows.length&&qRaw&&totalSinBuscar){
+    container.innerHTML=`<div class="gc" style="text-align:center;padding:32px 20px;color:var(--text3)">
+      <div style="font-size:1.6rem;margin-bottom:10px">🔍</div>
+      <div style="font-weight:600;margin-bottom:6px">Ningún lote coincide con "${escHtml(qRaw)}"</div>
+      <div style="font-size:.82rem">Probá con otra parte del número de lote o con el nombre del insumo</div>
+    </div>`;
+    return;
+  }
   if(!rows.length){
     container.innerHTML=`<div class="gc" style="text-align:center;padding:40px 20px;color:var(--text3)">
       <div style="font-size:2rem;margin-bottom:12px">📦</div>
@@ -6887,6 +7077,7 @@ function renderVencimientos(){
               style="flex-shrink:0;padding:5px 11px;border-radius:var(--r-pill);border:1px solid rgba(0,0,0,.1);background:var(--glass2);font-size:.78rem;font-weight:600;color:var(--text2);cursor:pointer;-webkit-tap-highlight-color:transparent">✏️ Editar</button>
           </div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            ${lote.numeroLote?`<span style="font-size:.78rem;color:var(--text)">🏷️ Lote <strong>${escHtml(lote.numeroLote)}</strong></span>`:`<span style="font-size:.72rem;color:var(--text3)">🏷️ Sin n° de lote</span>`}
             <span style="font-size:.78rem;color:var(--text2)">📅 <strong>${fmtDate(lote.fechaVenc)}</strong></span>
             <span style="font-size:.78rem;color:var(--text2)">📦 ${lote.qty} ${escHtml(lote.unit)}</span>
             <span style="font-size:.78rem;color:var(--text3)">${escHtml(lote.centerLabel)}</span>
@@ -7294,7 +7485,7 @@ function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
             if(lotes[i].qty<=0) continue;
             var take=Math.min(lotes[i].qty,rem);
             lotes[i].qty-=take; rem-=take;
-            consumedLotes.push({loteId:lotes[i].id,fechaVenc:lotes[i].fechaVenc,qty:take});
+            consumedLotes.push(Object.assign({loteId:lotes[i].id,fechaVenc:lotes[i].fechaVenc,qty:take},lotes[i].numeroLote?{numeroLote:lotes[i].numeroLote}:{}));
           }
           if(consumedLotes.length) mov.lotesConsumidos=consumedLotes;
           var remaining=lotes.filter(function(l){return l.qty>0;});
