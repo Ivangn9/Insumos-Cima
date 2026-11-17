@@ -58,6 +58,10 @@ No reintroducir estos patrones, cada uno causó o podía causar pérdida de dato
 - IDs de lote: `_newLoteId()` (nunca `"lot_"+Date.now()` solo, que duplicaba IDs cuando un traslado creaba varios lotes en el mismo milisegundo).
 - Inventario tiene dos vistas (`_invView`, solo en memoria): "Por insumo" (etiquetas de lotes debajo de cada fila) y "Por lote y vencimiento" (`_renderInvLotes`: una fila por lote ordenada por vencimiento + bloque "Sin lote registrado" con el stock no asignado a lotes). Los buscadores de Inventario, Vencimientos y de la ficha del insumo (pestaña Lotes) encuentran por número de lote.
 
+## Centros que piden sin depósito propio (CRS)
+
+`pedido-insumos.html` ofrece GN, Pedernera-Sarmiento y **CRS · Clínica del Sud** (valor `CRS`). CRS no es una sucursal de Stock: al entregar su pedido, `markSolicitudEntregado` descuenta de la sucursal que lo abastece según `SOLICITUD_ABASTECIDA_DESDE` (`{CRS:"Sarmiento"}`), y la salida queda con la nota "Pedido CRS · …". Para sumar otro centro así: agregar la opción en el `<select id="sector">` de Pedido + una entrada en ese mapa. Un sector que no esté en el mapa ni sea sucursal se marca entregado sin descontar stock.
+
 ## Features — Comparador de presupuestos de proveedores
 
 Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.

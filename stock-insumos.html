@@ -2564,7 +2564,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.7";
+const APP_VERSION = "6.8";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -7428,11 +7428,16 @@ function marcarTodasLeidas(){
 // tocar el stock; si no, descuenta y lo marca entregado de forma atómica.
 // Los IDs de movimiento son fijos por pedido+insumo (no Date.now()), así que
 // tampoco pueden duplicarse.
+// Centros que piden insumos pero NO tienen depósito propio: de qué sucursal
+// sale su stock al entregarles un pedido.
+const SOLICITUD_ABASTECIDA_DESDE={CRS:"Sarmiento"}; // CRS · Clínica del Sud
+function _stockCenterFor(sector){ return SOLICITUD_ABASTECIDA_DESDE[sector]||sector; }
 function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
   const s=solicitudes.find(x=>x.id===id); if(!s) return;
   const lockKey='entregar_'+id;
   if(!_lock(lockKey)) return;
-  const center=s.sector;
+  const center=_stockCenterFor(s.sector);
+  const otroCentro=center!==s.sector; // ej. pedido de CRS que sale de Pedernera-Sarmiento
   const dateStr=new Date().toISOString().split("T")[0];
   const timeStr=new Date().toTimeString().slice(0,5);
   const solRef=_db.collection("insumos_cima").doc("solicitudes_log").collection("items").doc(id);
@@ -7460,7 +7465,7 @@ function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
     const qty=qtyMap?((qtyMap[item.id]??item.cantidad)||0):(item.cantidad||0);
     return {id:"sol_"+id+"_"+item.id,supplyId:item.id,supplyName:supply.name,
       type:"salida",qty,date:dateStr,time:timeStr,
-      note:"Pedido · "+(s.solicitante||"")+(s.equipo?" · "+s.equipo:""),
+      note:"Pedido"+(otroCentro?" "+s.sector:"")+" · "+(s.solicitante||"")+(s.equipo?" · "+s.equipo:""),
       ...(currentUser?.email&&{user:currentUser.email})};
   });
   const centerRef=_db.collection(DB_COL).doc(_centerKey(center));
@@ -7504,7 +7509,7 @@ function markSolicitudEntregado(id, qtyMap, recibidoPor, firma){
     cs[center].lotes=data.lotes;
     const auditItems=(s.items||[]).filter(function(i){return i.id;}).map(function(i){return {id:i.id,name:i.name,qty:qtyMap?(qtyMap[i.id]??i.cantidad):i.cantidad};});
     _auditLog('solicitud_entregado',"Pedido entregado: "+(s.solicitante||'?')+" · "+(s.sector||'')+" · "+(s.fecha||''),null,{id,items:auditItems,center});
-    toast("✓ Pedido entregado · Stock actualizado");
+    toast("✓ Pedido entregado · Stock actualizado"+(otroCentro?" en "+((BRAND_THEMES[center]&&BRAND_THEMES[center].nombre)||center):""));
     closePdfViewer();
   }).catch(onError)
     .finally(function(){ _unlock(lockKey); });
