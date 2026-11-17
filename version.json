@@ -1,5 +1,5 @@
 {
-  "version": "1.0.33",
-  "date": "2026-07-14",
-  "changelog": "Visor de pedidos: boton en topbar con badge de pendientes, modal con tabs Pendientes/Entregados, ultimos 10 dias"
+  "version": "1.0.34",
+  "date": "2026-11-17",
+  "changelog": "Agrega CRS · Clínica del Sud al selector de Centro; envío de pedidos sin duplicados ni bloqueos sin señal"
 }

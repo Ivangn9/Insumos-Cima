@@ -32,6 +32,11 @@ App de venta de comida, sin relación con CIMA. Convive en este repo pero es un 
 - Formato `MAJOR.MINOR` (sin PATCH). Bump manual (no hay script tipo `tools/bump.js` acá todavía): patch/fix menores no requieren bump; una feature nueva sube MINOR (ej. `6.0`→`6.1`); un cambio estructural grande sube MAJOR y resetea MINOR a 0.
 - No hay changelog embebido (a diferencia de MedTrack) — no hace falta tocar nada más allá de las dos constantes.
 
+## Versiones — `pedido-insumos.html` (sistema APARTE del de Stock)
+
+- Pedido tiene su propio auto-update: compara `const CURRENT_VERSION` (en `pedido-insumos.html`) con `version.json` (leído vía GitHub API para saltear la caché del CDN). Si `version.json` es mayor, borra cachés y recarga sola.
+- **Todo cambio en `pedido-insumos.html` tiene que subir las DOS** (`CURRENT_VERSION` y `version.json`, formato `1.0.N`). Si no, las copias ya abiertas/instaladas no se enteran del cambio y siguen mostrando la versión vieja (pasó con CRS, nov-2026). El bump de `APP_VERSION` de Stock no afecta a Pedido.
+
 ## Guardado y cache offline — `stock-insumos.html`
 
 Las escrituras (`persist*`) están bloqueadas hasta que `_dataReady` sea `true`, y eso solo pasa con snapshots confirmados por el servidor (`_markLoaded` ignora `fromCache`). Como hay cache offline (`enablePersistence`), los listeners de `supplies`, `center_GN` y `center_Sarmiento` **deben** usar `onSnapshot({includeMetadataChanges:true}, …)`: sin eso, si el servidor confirma datos idénticos al cache, Firestore no emite el snapshot de confirmación y todas las escrituras quedan bloqueadas en silencio desde la segunda apertura de la app (bug real, corregido en V6.4). Cualquier listener nuevo que alimente `_markLoaded` necesita el mismo flag.
