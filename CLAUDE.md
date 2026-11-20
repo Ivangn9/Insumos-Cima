@@ -67,6 +67,13 @@ No reintroducir estos patrones, cada uno causó o podía causar pérdida de dato
 
 `pedido-insumos.html` ofrece GN, Pedernera-Sarmiento y **CRS · Clínica del Sud** (valor `CRS`). CRS no es una sucursal de Stock: al entregar su pedido, `markSolicitudEntregado` descuenta de la sucursal que lo abastece según `SOLICITUD_ABASTECIDA_DESDE` (`{CRS:"Sarmiento"}`), y la salida queda con la nota "Pedido CRS · …". Para sumar otro centro así: agregar la opción en el `<select id="sector">` de Pedido + una entrada en ese mapa. Un sector que no esté en el mapa ni sea sucursal se marca entregado sin descontar stock.
 
+## PDF: armado común (V6.9)
+
+- Estilo de todos los PDF de la app: cabecera azul marino con logo + franja azul, caja de datos (etiqueta chica azul + valor), tablas autotable con encabezado azul marino y filas alternadas `bgBlue`, barra de total azul marino, pie "CIMA · … · año" + "Página X de Y".
+- Piezas reutilizables (usarlas en todo PDF nuevo en vez de copiar código): `_pdfPalette`, `_pdfLoadLogo()`, `_pdfDrawHeader(doc,{logo,title,subtitle,right})` → devuelve `y`, `_pdfDrawMetaBox(doc,y,[{label,val}])` → devuelve `y`, `_pdfDrawFooter(doc,label)`, `_pdfSave(doc,filename)`. Los PDF anteriores (reporte de stock, contable, solicitud) todavía tienen su código propio equivalente; no se migraron para no arriesgarlos.
+- Paginación por bloque: en tablas, `rowPageBreak:"avoid"` (una fila nunca se parte entre hojas) y `showHead:"everyPage"`; las barras/bloques de total se pasan enteros a la hoja siguiente si no entran.
+- Control Contable → Entradas y Salidas: Excel y PDF salen de la MISMA fuente, `_pracMovExportData()` (movimientos tildados del mes/sucursal, orden cronológico, totales). El PDF (`exportContableMovsPDF`) es A4 apaisado por la cantidad de columnas; los anchos de columna deben sumar 269 mm.
+
 ## Features — Comparador de presupuestos de proveedores
 
 Modal `#comparadorModal`, prefijo de funciones `_cp*` (cerca de `_pi*` en el código, cerca de la línea 4025). Permite subir hasta 10 Excel (uno por proveedor, columnas variables por archivo) y compara precio por insumo, emparejando entre archivos por similitud de nombre (reutiliza `_impNorm`/`_impSim`, umbral ajustable, default 95%). **No persiste nada en Firestore** — es una herramienta de trabajo puntual, el estado se pierde al cerrar el modal. No confundir con `_pi*` (Importar lista de precios), que sí actualiza el catálogo real.
