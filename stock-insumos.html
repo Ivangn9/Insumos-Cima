@@ -2564,7 +2564,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.8";
+const APP_VERSION = "6.9";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -8938,6 +8938,7 @@ function renderPracMovs(el){
     <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(true)">☑ Marcar todos</button>
     <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(false)">☐ Desmarcar todos</button>
     <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableMovsExcel()">📊 Exportar Excel</button>
+    <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableMovsPDF()">📄 Exportar PDF</button>
   </div>`;
 
   let selCount=0, montoSel=0;
@@ -8996,51 +8997,226 @@ function _pracMovToggleAll(checkAll){
   renderContable();
 }
 
+// Datos de la exportación de Entradas y Salidas: UNA sola fuente para el
+// Excel y el PDF, así los dos muestran siempre exactamente lo mismo — los
+// movimientos tildados del mes y la sucursal elegidos, en orden cronológico.
+// "Gasto real" = salidas valorizadas al precio actual del insumo, sin contar
+// traslados entre sucursales (no son consumo).
+function _pracMovExportData(){
+  const rows=_pracMovList().filter(function(m){ return !_pracMovExcluded.has(m.id); })
+    .sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); });
+  let ent=0,sal=0,monto=0;
+  const items=rows.map(function(m){
+    const s=supplies.find(function(x){return x.id===m.supplyId;});
+    const precio=s?.price||0;
+    const esGasto=m.type==='salida'&&!m.traslado;
+    const rowMonto=esGasto?m.qty*precio:0;
+    if(m.type==='entrada') ent+=m.qty; else sal+=m.qty;
+    if(esGasto) monto+=rowMonto;
+    return {m:m, unit:s?.unit||'UND', precio:precio, esGasto:esGasto, rowMonto:rowMonto};
+  });
+  return {
+    items:items, ent:ent, sal:sal, monto:monto,
+    mesLabel:_monthLabel(_pracMovMes),
+    centerLabel:_pracMovCenter==='Todas'?'Todas las sucursales':((BRAND_THEMES[_pracMovCenter]&&BRAND_THEMES[_pracMovCenter].nombre)||_pracMovCenter),
+    fileBase:"entradas-salidas-cima-"+(_pracMovCenter==='Todas'?'todas':_pracMovCenter)+"-"+(_pracMovMes||'')
+  };
+}
+
 async function exportContableMovsExcel(){
-  const rows=_pracMovList().filter(function(m){ return !_pracMovExcluded.has(m.id); });
-  if(!rows.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
+  const d=_pracMovExportData();
+  if(!d.items.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
   toast("Generando Excel…");
   try{
     await _piLoadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     if(typeof XLSX==='undefined') throw new Error('No se pudo iniciar el generador de Excel');
 
-    const mesLabel=_monthLabel(_pracMovMes);
-    const centerLabel=_pracMovCenter==='Todas'?'Todas las sucursales':((BRAND_THEMES[_pracMovCenter]&&BRAND_THEMES[_pracMovCenter].nombre)||_pracMovCenter);
-
-    const aoa=[["Control de Entradas y Salidas de Insumos — CIMA"],[mesLabel+" · "+centerLabel],[],
+    const aoa=[["Control de Entradas y Salidas de Insumos — CIMA"],[d.mesLabel+" · "+d.centerLabel],[],
       ["Fecha","Hora","Sucursal","Tipo","Insumo","Cantidad","Unidad","Precio unitario","Monto","Traslado","Proveedor","Nota","Usuario"]];
-
-    let ent=0,sal=0,monto=0;
-    rows.sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); }).forEach(function(m){
-      const s=supplies.find(function(x){return x.id===m.supplyId;});
-      const precio=s?.price||0;
-      const esGasto=m.type==='salida'&&!m.traslado;
-      const rowMonto=esGasto?m.qty*precio:0;
-      if(m.type==='entrada') ent+=m.qty; else sal+=m.qty;
-      if(esGasto) monto+=rowMonto;
+    d.items.forEach(function(it){
+      const m=it.m;
       aoa.push([
         m.date||'', m.time||'', m._center||'',
         m.type==='entrada'?'Entrada':'Salida',
-        m.supplyName||'', m.qty||0, s?.unit||'UND',
-        precio>0?precio:'', esGasto?rowMonto:'',
+        m.supplyName||'', m.qty||0, it.unit,
+        it.precio>0?it.precio:'', it.esGasto?it.rowMonto:'',
         m.traslado?'Sí':'No',
         m.proveedorName||'', m.note||'', m.user||''
       ]);
     });
     aoa.push([]);
-    aoa.push(["","","","Entradas (unidades)",ent]);
-    aoa.push(["","","","Salidas (unidades)",sal]);
-    aoa.push(["","","","Monto total (gasto real)",monto]);
+    aoa.push(["","","","Entradas (unidades)",d.ent]);
+    aoa.push(["","","","Salidas (unidades)",d.sal]);
+    aoa.push(["","","","Monto total (gasto real)",d.monto]);
 
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols']=[{wch:12},{wch:8},{wch:14},{wch:10},{wch:32},{wch:10},{wch:8},{wch:14},{wch:14},{wch:10},{wch:18},{wch:24},{wch:16}];
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,"Entradas y Salidas");
-    const filename="entradas-salidas-cima-"+(_pracMovCenter==='Todas'?'todas':_pracMovCenter)+"-"+(_pracMovMes||'')+".xlsx";
-    _downloadXlsxWorkbook(wb,filename);
+    _downloadXlsxWorkbook(wb,d.fileBase+".xlsx");
     toast("✓ Excel de entradas y salidas exportado");
   }catch(e){
     console.error(e);toast("⚠️ Error al generar Excel");
+  }
+}
+
+// ─── Piezas comunes de los PDF (mismo armado visual que el reporte de stock
+// y el PDF contable: cabecera azul marino con logo, caja de datos, tablas con
+// encabezado azul marino y filas alternadas, pie con número de página). Por
+// ahora las usa exportContableMovsPDF; los PDF anteriores siguen con su
+// código propio, intacto. ─────────────────────────────────────────────────
+const _pdfPalette={navy:[15,35,80],blue:[0,113,227],blueLight:[0,90,180],dark:[28,28,30],gray2:[100,100,112],gray3:[155,155,168],
+  bgLight:[245,247,252],bgBlue:[236,244,255],border:[208,220,238],white:[255,255,255],green:[26,143,60],red:[200,40,30]};
+async function _pdfLoadLogo(){
+  try{
+    const resp=await fetch("logo.png");
+    if(!resp.ok) return null;
+    const blob=await resp.blob();
+    const data=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(blob);});
+    return await new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>{const maxH=16,maxW=42;const ratio=img.naturalWidth/img.naturalHeight;res({data,h:maxH,w:Math.min(maxW,maxH*ratio)});};
+      img.onerror=()=>res(null); img.src=data;
+    });
+  }catch(e){ return null; }
+}
+// Dibuja la cabecera y devuelve la posición vertical donde sigue el contenido.
+function _pdfDrawHeader(doc,{logo,title,subtitle,right}){
+  const C=_pdfPalette, pageW=doc.internal.pageSize.getWidth(), mg=14, headerH=32;
+  doc.setFillColor(...C.navy);doc.rect(0,0,pageW,headerH,"F");
+  doc.setFillColor(...C.blue);doc.rect(0,headerH-1.8,pageW,1.8,"F");
+  let titleX=mg;
+  if(logo&&logo.w>0){try{doc.addImage(logo.data,"PNG",mg,(headerH-1.8-logo.h)/2,logo.w,logo.h,undefined,"FAST");titleX=mg+logo.w+7;}catch(e){}}
+  doc.setTextColor(...C.white);doc.setFontSize(15.5);doc.setFont("helvetica","bold");
+  doc.text(title,titleX,headerH*0.43);
+  doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(170,200,240);
+  doc.text(subtitle,titleX,headerH*0.71);
+  if(right){doc.setFontSize(7);doc.setTextColor(130,170,220);doc.text(right,pageW-mg,headerH*0.55,{align:"right"});}
+  return headerH+9;
+}
+// Caja de datos (etiqueta chica azul + valor) en columnas iguales.
+function _pdfDrawMetaBox(doc,y,items){
+  const C=_pdfPalette, pageW=doc.internal.pageSize.getWidth(), mg=14, boxH=20;
+  doc.setFillColor(...C.bgLight);doc.setDrawColor(...C.border);doc.setLineWidth(0.3);
+  doc.roundedRect(mg,y,pageW-mg*2,boxH,2,2,"FD");
+  const colW=(pageW-mg*2)/items.length;
+  items.forEach((item,i)=>{
+    const ix=mg+i*colW+5;
+    doc.setFontSize(6);doc.setFont("helvetica","bold");doc.setTextColor(...C.blue);
+    doc.text(item.label,ix,y+6.5);
+    doc.setFontSize(8.6);doc.setFont("helvetica","bold");doc.setTextColor(...C.dark);
+    doc.text(item.val,ix,y+13.5,{maxWidth:colW-8});
+    if(i<items.length-1){doc.setDrawColor(...C.border);doc.setLineWidth(0.3);doc.line(mg+colW*(i+1),y+4,mg+colW*(i+1),y+boxH-4);}
+  });
+  return y+boxH+10;
+}
+function _pdfDrawFooter(doc,label){
+  const C=_pdfPalette, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight(), mg=14;
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFillColor(...C.blue);doc.rect(mg,pageH-10,4,0.8,"F");
+    doc.setDrawColor(...C.border);doc.setLineWidth(0.25);doc.line(mg+6,pageH-9.6,pageW-mg,pageH-9.6);
+    doc.setFontSize(7);doc.setFont("helvetica","bold");doc.setTextColor(...C.blue);
+    doc.text("CIMA",mg,pageH-5.5);
+    doc.setFont("helvetica","normal");doc.setTextColor(...C.gray3);
+    doc.text(" · "+label+" · "+new Date().getFullYear(),mg+8.5,pageH-5.5);
+    doc.setFont("helvetica","bold");doc.setTextColor(...C.gray2);
+    doc.text("Página "+i+" de "+pageCount,pageW-mg,pageH-5.5,{align:"right"});
+  }
+}
+function _pdfSave(doc,filename){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS){doc.output("dataurlnewwindow",{filename});return;}
+  const blob=doc.output("blob");const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
+}
+
+// Mismos datos que exportContableMovsExcel (vía _pracMovExportData), en PDF.
+// A4 apaisado: son 11 columnas y en vertical insumo/proveedor/nota quedaban
+// ilegibles. El encabezado de la tabla se repite en cada página y la barra de
+// totales nunca queda partida entre dos hojas.
+async function exportContableMovsPDF(){
+  const d=_pracMovExportData();
+  if(!d.items.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
+  if(!window.jspdf){toast("⚠️ Librería PDF no cargada, intentá de nuevo");return;}
+  toast("Generando PDF…");
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+    const C=_pdfPalette, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight(), mg=14;
+    const logo=await _pdfLoadLogo();
+    let y=_pdfDrawHeader(doc,{logo,title:"Control de Entradas y Salidas",subtitle:"CIMA · Movimientos de Insumos · Control Contable",right:d.mesLabel});
+
+    const totalMes=_pracMovList().length;
+    y=_pdfDrawMetaBox(doc,y,[
+      {label:"PERÍODO",val:d.mesLabel},
+      {label:"SUCURSAL",val:d.centerLabel},
+      {label:"MOVIMIENTOS",val:d.items.length===totalMes?String(d.items.length):d.items.length+" de "+totalMes+" (selección)"},
+      {label:"GASTO REAL",val:"$"+fmt(d.monto)},
+    ]);
+
+    // Nombre corto en la tabla (el completo ya figura en la caja de datos): un
+    // nombre largo partía cada fila en dos renglones.
+    const sucName=c=>c==="GN"?"GN":((BRAND_THEMES[c]&&BRAND_THEMES[c].nombre)||c||"");
+    const body=d.items.map(it=>{
+      const m=it.m;
+      return [
+        fmtDate(m.date)+(m.time?" "+m.time:""),
+        sucName(m._center),
+        m.type==='entrada'?'Entrada':'Salida',
+        m.supplyName||'',
+        (m.qty||0)+" "+it.unit,
+        it.precio>0?"$"+fmt(it.precio):"—",
+        it.esGasto?"$"+fmt(it.rowMonto):"—",
+        m.traslado?"Sí":"—",
+        m.proveedorName||"",
+        m.note||"",
+        (m.user||"").split("@")[0]
+      ];
+    });
+    doc.autoTable({startY:y,margin:{left:mg,right:mg,top:mg+4,bottom:16},
+      head:[["Fecha","Sucursal","Tipo","Insumo","Cantidad","Precio unit.","Monto","Traslado","Proveedor","Nota","Usuario"]],
+      body,showHead:"everyPage",
+      // Una fila nunca se parte entre dos hojas: si no entra entera, pasa completa a la siguiente
+      rowPageBreak:"avoid",
+      headStyles:{fillColor:C.navy,textColor:255,fontStyle:"bold",fontSize:7.4,cellPadding:{top:3,bottom:3,left:2,right:2},overflow:"visible"},
+      bodyStyles:{fontSize:7.3,textColor:C.dark,cellPadding:2.4,overflow:"linebreak",valign:"middle"},
+      alternateRowStyles:{fillColor:C.bgBlue},
+      // Anchos (suman 269 mm = A4 apaisado menos márgenes)
+      columnStyles:{
+        0:{cellWidth:28},1:{cellWidth:29},2:{cellWidth:15},3:{cellWidth:51},
+        4:{cellWidth:18,halign:"center"},5:{cellWidth:21,halign:"right"},6:{cellWidth:22,halign:"right"},
+        7:{cellWidth:17,halign:"center"},8:{cellWidth:26},9:{cellWidth:24},10:{cellWidth:18}
+      },
+      didParseCell:(data)=>{
+        if(data.section==="body"&&data.column.index===2){
+          data.cell.styles.fontStyle="bold";
+          data.cell.styles.textColor=data.cell.raw==="Entrada"?C.green:C.red;
+        }
+      }
+    });
+    y=doc.lastAutoTable.finalY+8;
+
+    // ── Barra de totales (igual que el PDF contable), nunca partida ──
+    if(y>pageH-38){doc.addPage();y=mg+5;}
+    doc.setFillColor(...C.navy);doc.roundedRect(mg,y,pageW-mg*2,16,2,2,"F");
+    doc.setTextColor(...C.white);doc.setFontSize(8.6);doc.setFont("helvetica","bold");
+    doc.text("ENTRADAS: "+fmt(d.ent)+" u.",mg+6,y+10);
+    doc.text("SALIDAS: "+fmt(d.sal)+" u.",mg+62,y+10);
+    doc.setFontSize(8);doc.text("GASTO REAL DEL PERÍODO",pageW-mg-70,y+10,{align:"right"});
+    doc.setFontSize(12.5);doc.text("$"+fmt(d.monto),pageW-mg-6,y+10.4,{align:"right"});
+    y+=21;
+    doc.setTextColor(...C.gray2);doc.setFontSize(6.8);doc.setFont("helvetica","normal");
+    doc.text("Gasto real: salidas valorizadas al precio actual de cada insumo, sin contar traslados entre sucursales.",mg,y);
+
+    _pdfDrawFooter(doc,"Control Contable · Entradas y Salidas");
+    _pdfSave(doc,d.fileBase+".pdf");
+    toast("✓ PDF de entradas y salidas exportado");
+  }catch(e){
+    console.error(e);toast("⚠️ Error al generar PDF");
   }
 }
 
