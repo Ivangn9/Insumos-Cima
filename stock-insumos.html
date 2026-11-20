@@ -591,6 +591,14 @@
     .type-toggle-btn.salida.selected  { background: var(--red); border-color: var(--red); color: white; box-shadow: 0 4px 12px rgba(255,59,48,.35); }
     .fmt-pill { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:20px; border:1.5px solid rgba(0,0,0,0.10); background:rgba(0,0,0,0.04); cursor:pointer; font-size:.82rem; font-weight:600; color:var(--text3); transition:all .15s; user-select:none; -webkit-tap-highlight-color:transparent; }
     .fmt-pill.active { background:rgba(0,113,227,0.10); border-color:#0071e3; color:#0071e3; }
+    /* Ventana de opciones del PDF de Entradas y Salidas */
+    .mp-section { margin-bottom:16px; }
+    .mp-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .mp-head .rep-section-label { margin:0; }
+    .mp-link { margin-left:auto; border:none; background:none; color:var(--accent); font-size:.76rem; font-weight:650; cursor:pointer; padding:2px 4px; font-family:inherit; }
+    .mp-pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .mp-summary { margin-top:4px; padding:10px 14px; border-radius:var(--r-md); background:rgba(0,113,227,.08); color:var(--accent); font-size:.82rem; font-weight:650; }
+    .mp-summary.warn { background:rgba(255,59,48,.10); color:#c0271f; }
     .modal-footer { display: flex; gap: 8px; padding: 16px 24px 0; }
     .modal-footer .btn { flex: 1; justify-content: center; }
 
@@ -2079,6 +2087,47 @@
 </div>
 
 <!-- ─── Modal Editar Lote ──────────────────────────────────────────────── -->
+<!-- ─── Opciones del PDF de Entradas y Salidas (Control Contable) ─────── -->
+<div class="modal-overlay" id="movsPdfModal" onclick="closeMovsPdfModal(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="max-width:560px">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 24px;margin-bottom:6px">
+      <div class="modal-title" style="padding:0;margin:0">📄 Exportar PDF</div>
+      <button class="modal-close-btn" onclick="closeMovsPdfModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:.78rem;color:var(--text3);margin-bottom:16px">Elegí qué incluir en el PDF. Se parte de los movimientos tildados en la lista.</div>
+      <div class="mp-section">
+        <div class="mp-head"><div class="rep-section-label">Movimientos</div></div>
+        <div class="mp-pills" id="mpTipo">
+          <button class="rep-pill" data-tipo="ambos" onclick="_movsPdfSetTipo('ambos')">Entradas y salidas</button>
+          <button class="rep-pill" data-tipo="entrada" onclick="_movsPdfSetTipo('entrada')">Solo entradas</button>
+          <button class="rep-pill" data-tipo="salida" onclick="_movsPdfSetTipo('salida')">Solo salidas</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.84rem;color:var(--text2);cursor:pointer">
+          <input type="checkbox" id="mpTraslados" onchange="_movsPdfSetTraslados(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+          Incluir traslados entre sucursales
+        </label>
+      </div>
+      <div class="mp-section">
+        <div class="mp-head"><div class="rep-section-label">Categorías</div>
+          <button class="mp-link" onclick="_movsPdfAllCats(true)">Todas</button><button class="mp-link" style="margin-left:0" onclick="_movsPdfAllCats(false)">Ninguna</button></div>
+        <div class="mp-pills" id="mpCats"></div>
+      </div>
+      <div class="mp-section">
+        <div class="mp-head"><div class="rep-section-label">Columnas del PDF</div>
+          <button class="mp-link" onclick="_movsPdfAllCols(true)">Todas</button><button class="mp-link" style="margin-left:0" onclick="_movsPdfAllCols(false)">Ninguna</button></div>
+        <div class="mp-pills" id="mpCols"></div>
+      </div>
+      <div class="mp-summary" id="mpSummary"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeMovsPdfModal()">Cancelar</button>
+      <button class="btn btn-primary" id="mpGenBtn" onclick="_movsPdfGenerate()"><span class="btn-icon">📄</span> Generar PDF</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editLoteModal" onclick="closeEditLoteModal(event)">
   <div class="modal-sheet" onclick="event.stopPropagation()" style="max-width:420px">
     <div class="modal-handle"></div>
@@ -2564,7 +2613,7 @@
 
 <script>
 // ─── Version & Auto-Update ────────────────────────────────────────────────────
-const APP_VERSION = "6.9";
+const APP_VERSION = "6.10";
 
 (function initVersion(){
   const el = document.getElementById("versionBadge");
@@ -8938,7 +8987,7 @@ function renderPracMovs(el){
     <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(true)">☑ Marcar todos</button>
     <button class="btn btn-secondary" style="padding:8px 14px;font-size:.82rem" onclick="_pracMovToggleAll(false)">☐ Desmarcar todos</button>
     <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableMovsExcel()">📊 Exportar Excel</button>
-    <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="exportContableMovsPDF()">📄 Exportar PDF</button>
+    <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="openMovsPdfOptions()">📄 Exportar PDF</button>
   </div>`;
 
   let selCount=0, montoSel=0;
@@ -9013,7 +9062,7 @@ function _pracMovExportData(){
     const rowMonto=esGasto?m.qty*precio:0;
     if(m.type==='entrada') ent+=m.qty; else sal+=m.qty;
     if(esGasto) monto+=rowMonto;
-    return {m:m, unit:s?.unit||'UND', precio:precio, esGasto:esGasto, rowMonto:rowMonto};
+    return {m:m, unit:s?.unit||'UND', precio:precio, esGasto:esGasto, rowMonto:rowMonto, cat:s?.category||'Sin categoría'};
   });
   return {
     items:items, ent:ent, sal:sal, monto:monto,
@@ -9134,13 +9183,110 @@ function _pdfSave(doc,filename){
   setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},2000);
 }
 
-// Mismos datos que exportContableMovsExcel (vía _pracMovExportData), en PDF.
-// A4 apaisado: son 11 columnas y en vertical insumo/proveedor/nota quedaban
-// ilegibles. El encabezado de la tabla se repite en cada página y la barra de
-// totales nunca queda partida entre dos hojas.
-async function exportContableMovsPDF(){
+// ─── PDF de Entradas y Salidas: columnas y filtros elegibles ──────────────
+// Nombre corto de sucursal para la tabla (el completo ya figura en la caja de
+// datos): un nombre largo partía cada fila en dos renglones.
+function _movsSucCorto(c){ return c==="GN"?"GN":((BRAND_THEMES[c]&&BRAND_THEMES[c].nombre)||c||""); }
+// Columnas disponibles, en el orden en que aparecen. `w` = ancho base en mm
+// (con todas las de def:true suman 269, el ancho útil del A4 apaisado); al
+// elegir menos columnas los anchos se reparten proporcionalmente.
+const MOVS_PDF_COLS=[
+  {key:"fecha",     label:"Fecha y hora",       head:"Fecha",        w:28, val:it=>fmtDate(it.m.date)+(it.m.time?" "+it.m.time:"")},
+  {key:"sucursal",  label:"Sucursal",           head:"Sucursal",     w:29, val:it=>_movsSucCorto(it.m._center)},
+  {key:"tipo",      label:"Tipo",               head:"Tipo",         w:15, val:it=>it.m.type==="entrada"?"Entrada":"Salida"},
+  {key:"insumo",    label:"Nombre del insumo",  head:"Insumo",       w:51, val:it=>it.m.supplyName||""},
+  {key:"categoria", label:"Categoría",          head:"Categoría",    w:26, def:false, val:it=>it.cat},
+  {key:"cantidad",  label:"Cantidad",           head:"Cantidad",     w:18, halign:"center", val:it=>(it.m.qty||0)+" "+it.unit},
+  {key:"precio",    label:"Precio unitario",    head:"Precio unit.", w:21, halign:"right",  val:it=>it.precio>0?"$"+fmt(it.precio):"—"},
+  {key:"monto",     label:"Monto",              head:"Monto",        w:22, halign:"right",  val:it=>it.esGasto?"$"+fmt(it.rowMonto):"—"},
+  {key:"traslado",  label:"Traslado",           head:"Traslado",     w:17, halign:"center", val:it=>it.m.traslado?"Sí":"—"},
+  {key:"proveedor", label:"Proveedor",          head:"Proveedor",    w:26, val:it=>it.m.proveedorName||""},
+  {key:"nota",      label:"Nota",               head:"Nota",         w:24, val:it=>it.m.note||""},
+  {key:"usuario",   label:"Usuario",            head:"Usuario",      w:18, val:it=>(it.m.user||"").split("@")[0]},
+];
+// Opciones por defecto = exactamente el PDF de siempre (todas las columnas
+// originales, todos los movimientos tildados). La categoría es opcional.
+function _movsPdfDefaults(){
+  return {tipo:"ambos", traslados:true, catsOff:new Set(), cols:new Set(MOVS_PDF_COLS.filter(c=>c.def!==false).map(c=>c.key))};
+}
+// Aplica los filtros a los datos compartidos y recalcula los totales sobre lo filtrado.
+function _movsPdfApply(d,o){
+  const items=d.items.filter(it=>
+    (o.tipo==="ambos"||it.m.type===o.tipo) &&
+    (o.traslados||!it.m.traslado) &&
+    !o.catsOff.has(it.cat));
+  let ent=0,sal=0,monto=0;
+  items.forEach(it=>{ if(it.m.type==="entrada") ent+=it.m.qty; else sal+=it.m.qty; if(it.esGasto) monto+=it.rowMonto; });
+  return Object.assign({},d,{items,ent,sal,monto});
+}
+// Texto de los filtros aplicados (vacío si no hay ninguno), para dejarlo escrito en el PDF.
+function _movsPdfFilterLabel(o,allCats){
+  const p=[];
+  if(o.tipo==="entrada") p.push("solo entradas");
+  if(o.tipo==="salida") p.push("solo salidas");
+  if(!o.traslados) p.push("sin traslados");
+  const on=allCats.filter(c=>!o.catsOff.has(c));
+  if(on.length<allCats.length) p.push("categorías: "+on.join(", "));
+  return p.join(" · ");
+}
+
+// ── Ventana de opciones ──
+let _movsPdfOpts=null, _movsPdfCats=[];
+function openMovsPdfOptions(){
   const d=_pracMovExportData();
   if(!d.items.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
+  _movsPdfOpts=_movsPdfDefaults(); // siempre arranca con todo: se elige para ESTE PDF
+  _movsPdfCats=[...new Set(d.items.map(it=>it.cat))].sort((a,b)=>a.localeCompare(b,"es"));
+  document.getElementById("mpTraslados").checked=true;
+  _movsPdfRender();
+  document.getElementById("movsPdfModal").classList.add("open");
+}
+function closeMovsPdfModal(e){
+  if(e&&e.target!==e.currentTarget) return;
+  document.getElementById("movsPdfModal").classList.remove("open");
+}
+function _movsPdfRender(){
+  const o=_movsPdfOpts; if(!o) return;
+  document.querySelectorAll("#mpTipo .rep-pill").forEach(b=>b.classList.toggle("active",b.dataset.tipo===o.tipo));
+  document.getElementById("mpCats").innerHTML=_movsPdfCats.map(c=>
+    `<span class="fmt-pill${o.catsOff.has(c)?"":" active"}" data-cat="${escAttr(c)}" onclick="_movsPdfToggleCat(this.dataset.cat)">${escHtml(c)}</span>`).join("");
+  document.getElementById("mpCols").innerHTML=MOVS_PDF_COLS.map(c=>
+    `<span class="fmt-pill${o.cols.has(c.key)?" active":""}" data-col="${escAttr(c.key)}" onclick="_movsPdfToggleCol(this.dataset.col)">${escHtml(c.label)}</span>`).join("");
+  // Resumen en vivo + validación
+  const f=_movsPdfApply(_pracMovExportData(),o);
+  const sum=document.getElementById("mpSummary"), btn=document.getElementById("mpGenBtn");
+  let msg, ok=true;
+  if(!o.cols.size){ msg="⚠️ Elegí al menos una columna"; ok=false; }
+  else if(!f.items.length){ msg="⚠️ Ningún movimiento coincide con estos filtros"; ok=false; }
+  else msg=`Se van a exportar ${f.items.length} movimiento${f.items.length!==1?"s":""} · ${o.cols.size} columna${o.cols.size!==1?"s":""}`;
+  sum.textContent=msg; sum.classList.toggle("warn",!ok);
+  btn.disabled=!ok; btn.style.opacity=ok?"":".5";
+}
+function _movsPdfSetTipo(t){ _movsPdfOpts.tipo=t; _movsPdfRender(); }
+function _movsPdfSetTraslados(v){ _movsPdfOpts.traslados=v; _movsPdfRender(); }
+function _movsPdfToggleCat(c){ const s=_movsPdfOpts.catsOff; if(s.has(c)) s.delete(c); else s.add(c); _movsPdfRender(); }
+function _movsPdfAllCats(on){ _movsPdfOpts.catsOff=on?new Set():new Set(_movsPdfCats); _movsPdfRender(); }
+function _movsPdfToggleCol(k){ const s=_movsPdfOpts.cols; if(s.has(k)) s.delete(k); else s.add(k); _movsPdfRender(); }
+function _movsPdfAllCols(on){ _movsPdfOpts.cols=on?new Set(MOVS_PDF_COLS.map(c=>c.key)):new Set(); _movsPdfRender(); }
+function _movsPdfGenerate(){
+  const o=_movsPdfOpts; if(!o) return;
+  closeMovsPdfModal();
+  exportContableMovsPDF(o);
+}
+
+// Mismos datos que exportContableMovsExcel (vía _pracMovExportData), en PDF,
+// con los filtros y columnas elegidos en la ventana de opciones (sin opciones
+// = todo, igual que siempre). A4 apaisado; el encabezado de la tabla se repite
+// en cada hoja y ni las filas ni la barra de totales se parten entre hojas.
+async function exportContableMovsPDF(opts){
+  const o=opts||_movsPdfDefaults();
+  const base=_pracMovExportData();
+  if(!base.items.length){toast("⚠️ No hay movimientos seleccionados para exportar");return;}
+  const allCats=[...new Set(base.items.map(it=>it.cat))].sort((a,b)=>a.localeCompare(b,"es"));
+  const d=_movsPdfApply(base,o);
+  if(!d.items.length){toast("⚠️ Ningún movimiento coincide con los filtros elegidos");return;}
+  const cols=MOVS_PDF_COLS.filter(c=>o.cols.has(c.key));
+  if(!cols.length){toast("⚠️ Elegí al menos una columna");return;}
   if(!window.jspdf){toast("⚠️ Librería PDF no cargada, intentá de nuevo");return;}
   toast("Generando PDF…");
   try{
@@ -9157,42 +9303,40 @@ async function exportContableMovsPDF(){
       {label:"MOVIMIENTOS",val:d.items.length===totalMes?String(d.items.length):d.items.length+" de "+totalMes+" (selección)"},
       {label:"GASTO REAL",val:"$"+fmt(d.monto)},
     ]);
+    // Filtros aplicados, escritos en el PDF para que se sepa qué incluye
+    const filtros=_movsPdfFilterLabel(o,allCats);
+    if(filtros){
+      doc.setFontSize(7.4);doc.setFont("helvetica","bold");doc.setTextColor(...C.blue);
+      doc.text("FILTROS:",mg,y-3);
+      doc.setFont("helvetica","normal");doc.setTextColor(...C.gray2);
+      const lines=doc.splitTextToSize(filtros,pageW-mg*2-16);
+      doc.text(lines,mg+14,y-3);
+      y+=lines.length*3.4+3;
+    }
 
-    // Nombre corto en la tabla (el completo ya figura en la caja de datos): un
-    // nombre largo partía cada fila en dos renglones.
-    const sucName=c=>c==="GN"?"GN":((BRAND_THEMES[c]&&BRAND_THEMES[c].nombre)||c||"");
-    const body=d.items.map(it=>{
-      const m=it.m;
-      return [
-        fmtDate(m.date)+(m.time?" "+m.time:""),
-        sucName(m._center),
-        m.type==='entrada'?'Entrada':'Salida',
-        m.supplyName||'',
-        (m.qty||0)+" "+it.unit,
-        it.precio>0?"$"+fmt(it.precio):"—",
-        it.esGasto?"$"+fmt(it.rowMonto):"—",
-        m.traslado?"Sí":"—",
-        m.proveedorName||"",
-        m.note||"",
-        (m.user||"").split("@")[0]
-      ];
+    // Anchos: proporcionales al ancho base de cada columna elegida, ajustados
+    // para sumar exactamente el ancho útil (la última absorbe el redondeo).
+    const usable=pageW-mg*2;
+    const baseW=cols.reduce((a,c)=>a+c.w,0);
+    const columnStyles={}; let acc=0;
+    cols.forEach((c,i)=>{
+      const w=i<cols.length-1?Math.floor(c.w*usable/baseW*10)/10:Math.round((usable-acc)*10)/10;
+      acc+=w;
+      columnStyles[i]=Object.assign({cellWidth:w},c.halign?{halign:c.halign}:{});
     });
+    const tipoIdx=cols.findIndex(c=>c.key==="tipo");
     doc.autoTable({startY:y,margin:{left:mg,right:mg,top:mg+4,bottom:16},
-      head:[["Fecha","Sucursal","Tipo","Insumo","Cantidad","Precio unit.","Monto","Traslado","Proveedor","Nota","Usuario"]],
-      body,showHead:"everyPage",
+      head:[cols.map(c=>c.head)],
+      body:d.items.map(it=>cols.map(c=>c.val(it))),
+      showHead:"everyPage",
       // Una fila nunca se parte entre dos hojas: si no entra entera, pasa completa a la siguiente
       rowPageBreak:"avoid",
       headStyles:{fillColor:C.navy,textColor:255,fontStyle:"bold",fontSize:7.4,cellPadding:{top:3,bottom:3,left:2,right:2},overflow:"visible"},
       bodyStyles:{fontSize:7.3,textColor:C.dark,cellPadding:2.4,overflow:"linebreak",valign:"middle"},
       alternateRowStyles:{fillColor:C.bgBlue},
-      // Anchos (suman 269 mm = A4 apaisado menos márgenes)
-      columnStyles:{
-        0:{cellWidth:28},1:{cellWidth:29},2:{cellWidth:15},3:{cellWidth:51},
-        4:{cellWidth:18,halign:"center"},5:{cellWidth:21,halign:"right"},6:{cellWidth:22,halign:"right"},
-        7:{cellWidth:17,halign:"center"},8:{cellWidth:26},9:{cellWidth:24},10:{cellWidth:18}
-      },
+      columnStyles,
       didParseCell:(data)=>{
-        if(data.section==="body"&&data.column.index===2){
+        if(data.section==="body"&&data.column.index===tipoIdx){
           data.cell.styles.fontStyle="bold";
           data.cell.styles.textColor=data.cell.raw==="Entrada"?C.green:C.red;
         }
@@ -9200,7 +9344,7 @@ async function exportContableMovsPDF(){
     });
     y=doc.lastAutoTable.finalY+8;
 
-    // ── Barra de totales (igual que el PDF contable), nunca partida ──
+    // ── Barra de totales (sobre lo filtrado), nunca partida ──
     if(y>pageH-38){doc.addPage();y=mg+5;}
     doc.setFillColor(...C.navy);doc.roundedRect(mg,y,pageW-mg*2,16,2,2,"F");
     doc.setTextColor(...C.white);doc.setFontSize(8.6);doc.setFont("helvetica","bold");
@@ -9213,7 +9357,7 @@ async function exportContableMovsPDF(){
     doc.text("Gasto real: salidas valorizadas al precio actual de cada insumo, sin contar traslados entre sucursales.",mg,y);
 
     _pdfDrawFooter(doc,"Control Contable · Entradas y Salidas");
-    _pdfSave(doc,d.fileBase+".pdf");
+    _pdfSave(doc,d.fileBase+(filtros?"-filtrado":"")+".pdf");
     toast("✓ PDF de entradas y salidas exportado");
   }catch(e){
     console.error(e);toast("⚠️ Error al generar PDF");
